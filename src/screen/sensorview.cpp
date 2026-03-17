@@ -9,7 +9,7 @@
 SensorView::SensorView(Adafruit_Sensor **sensor_ptr) : sensor_ptr(sensor_ptr) {};
 
 void SensorView::process_navigation(
-    unsigned long button_select_press_time,
+    unsigned long button_select_press_duration,
     bool button_up_clicked,
     bool button_down_clicked
 ) {

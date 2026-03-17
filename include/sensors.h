@@ -18,4 +18,10 @@ extern Adafruit_Sensor *sensors[SENS_COUNT];
 
 bool init_sensors();
 
+void sleep_sensors();
+void wake_sensors();
+
+void set_low_power_sensor_mode();
+void unset_low_power_sensor_mode();
+
 #endif

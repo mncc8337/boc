@@ -13,7 +13,7 @@ protected:
 public:
     virtual void draw(U8G2 &u8g2) = 0;
     virtual void process_navigation(
-        unsigned long button_select_press_time,
+        unsigned long button_select_press_duration,
         bool button_up_clicked,
         bool button_down_clicked
     ) = 0;
@@ -31,7 +31,7 @@ private:
 public:
     SensorView(Adafruit_Sensor **sensor_ptr);
     void process_navigation(
-        unsigned long button_select_press_time,
+        unsigned long button_select_press_duration,
         bool button_up_clicked,
         bool button_down_clicked
     ) override;
@@ -46,13 +46,13 @@ private:
     unsigned item_count;
 
     int item_selected = 0;
-    int item_sel_previous;
-    int item_sel_next;
+    int item_sel_previous = -1;
+    int item_sel_next = 1;
 
 public:
-    Menu(const char **_menu_items, Action **_item_actions, unsigned _item_count);
+    Menu(const char **menu_items, Action **item_actions, unsigned item_count);
     void process_navigation(
-        unsigned long button_select_press_time,
+        unsigned long button_select_press_duration,
         bool button_up_clicked,
         bool button_down_clicked
     ) override;

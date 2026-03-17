@@ -3,17 +3,14 @@
 #include <bitmap.h>
 
 Menu::Menu(const char **menu_items, Action **item_actions, unsigned item_count)
-    : menu_items(menu_items), item_actions(item_actions),item_count(item_count) {
-    item_sel_previous = item_selected - 1;
-    item_sel_next = item_selected + 1;
-}
+    : menu_items(menu_items), item_actions(item_actions),item_count(item_count) {}
 
 Action *Menu::get_item_action() {
     return item_actions[item_selected];
 }
 
 void Menu::process_navigation(
-    unsigned long button_select_press_time,
+    unsigned long button_select_press_duration,
     bool button_up_clicked,
     bool button_down_clicked
 ) {
@@ -34,7 +31,7 @@ void Menu::process_navigation(
     item_sel_previous = item_selected - 1;
     item_sel_next = item_selected + 1;  
 
-    if(button_select_press_time > 50) {
+    if(button_select_press_duration > 50) {
         get_item_action()->execute();
     }
 

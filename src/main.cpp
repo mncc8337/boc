@@ -1,3 +1,4 @@
+#include "esp32-hal-gpio.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <esp_sleep.h>
@@ -38,6 +39,49 @@ void open_prev_screen() {
     current_screen->request_redraw();
 }
 
+void turn_off_screen() {
+    if(screen_off) return;
+
+    u8g2.setPowerSave(1);
+
+    if(!beacon_running) {
+        sleep_sensors();
+        gpio_wakeup_enable((gpio_num_t)BUTTON_SELECT_PIN, GPIO_INTR_HIGH_LEVEL);
+        esp_sleep_enable_gpio_wakeup();
+
+        // wait for button release
+        while(digitalRead(BUTTON_SELECT_PIN) != LOW) delay(10);
+
+        esp_light_sleep_start();
+
+        // the esp wakes up right there
+        // also wait for button release
+        while(digitalRead(BUTTON_SELECT_PIN) != LOW) delay(10);
+
+        wake_sensors();
+        u8g2.setPowerSave(0);
+        return; // no need to set flag
+    } else {
+        set_low_power_sensor_mode();
+        setCpuFrequencyMhz(80);
+    }
+
+    screen_off = true;
+}
+
+void turn_on_screen() {
+    if(!screen_off) return;
+
+    // if this func get called
+    // that mean beacom mode is not running
+
+    setCpuFrequencyMhz(160);
+    unset_low_power_sensor_mode();
+    u8g2.setPowerSave(0);
+
+    screen_off = false;
+}
+
 void setup() {
     pinMode(BUTTON_UP_PIN, INPUT);
     pinMode(BUTTON_DOWN_PIN, INPUT);
@@ -52,7 +96,7 @@ void setup() {
     u8g2.setBitmapMode(1);
 
     if(!init_sensors()) {
-        u8g2.printf("failed to init all sensors");
+        u8g2.printf("failed to init some sensors");
         while(1);
     }
 
@@ -69,8 +113,8 @@ void loop() {
     int button_down_state = digitalRead(BUTTON_DOWN_PIN);
 
     unsigned long button_select_press_time = 0;
-    bool button_up_action = screen_off; // lock these buttons when screen is off
-    bool button_down_action = screen_off;
+    bool button_up_action = false; // lock these buttons when screen is off
+    bool button_down_action = false;
 
     if(button_select_state == HIGH && !button_select_clicked) {
         button_select_clicked = true;
@@ -79,6 +123,19 @@ void loop() {
     if(button_select_state == LOW && button_select_clicked) { 
         button_select_press_time = millis() - first_select_press_ts;
         button_select_clicked = false;
+
+        bool event_consumed = true;
+
+        // global event
+        if(button_select_press_time >= 5000) {
+            turn_off_screen();
+        } else if(button_select_press_time >= 400) {
+            open_prev_screen();
+        } else {
+            event_consumed = false;
+        }
+
+        if(event_consumed) return;
     }
 
     if(button_up_state == HIGH && !button_up_clicked) {
@@ -86,7 +143,7 @@ void loop() {
     }
     if(button_up_state == LOW && button_up_clicked) {
         button_up_clicked = false;
-        button_up_action ^= true;
+        button_up_action = true;
     }
 
     if(button_down_state == HIGH && !button_down_clicked) {
@@ -94,15 +151,10 @@ void loop() {
     } 
     if(button_down_state == LOW && button_down_clicked) {
         button_down_clicked = false;
-        button_down_action ^= true;
+        button_down_action = true;
     }
 
-    if(button_select_press_time >= 400) {
-        // global action
-        open_prev_screen();
-    } else {
-        if(screen_off) itemaction_turn_on_screen();
-
+    if(!screen_off) {
         current_screen->process_navigation(
             button_select_press_time,
             button_up_action,
@@ -110,5 +162,10 @@ void loop() {
         );
 
         current_screen->draw(u8g2);
+    } else {
+        if(button_select_press_time > 0) {
+            turn_on_screen();
+            current_screen->request_redraw();
+        }
     }
 }

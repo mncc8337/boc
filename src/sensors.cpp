@@ -1,3 +1,4 @@
+#include "BH1750.h"
 #include <sensors.h>
 #include <BH1750_US.h>
 #include <Adafruit_BMP280.h>
@@ -42,4 +43,31 @@ bool init_sensors() {
     sensors[SENS_BMI160_GYROSCOPE] = &bmi160_gyro;
 
     return true;
+}
+
+void sleep_sensors() {
+    bmp280.setSampling(Adafruit_BMP280::MODE_SLEEP);
+    bh1750_hw.configure((BH1750::Mode)BH1750_POWER_DOWN);
+    // ahtx0 dont need to sleep
+    BMI160.setRegister(0x7E, 0x10); delay(50);
+    BMI160.setRegister(0x7E, 0x14); delay(50);
+}
+
+void wake_sensors() {
+    bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL);
+    bh1750_hw.configure(BH1750::CONTINUOUS_HIGH_RES_MODE_2);
+    BMI160.setRegister(0x7E, 0x11); delay(50);
+    BMI160.setRegister(0x7E, 0x15); delay(50);
+}
+
+void set_low_power_sensor_mode() {
+    bh1750_hw.configure(BH1750::ONE_TIME_HIGH_RES_MODE_2);
+    BMI160.setRegister(0x7E, 0x10); delay(50);
+    BMI160.setRegister(0x7E, 0x14); delay(50);
+}
+
+void unset_low_power_sensor_mode() {
+    bh1750_hw.configure(BH1750::CONTINUOUS_HIGH_RES_MODE_2);
+    BMI160.setRegister(0x7E, 0x11); delay(50);
+    BMI160.setRegister(0x7E, 0x15); delay(50);
 }

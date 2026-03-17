@@ -5,7 +5,4 @@
 
 extern Menu main_menu;
 
-void itemaction_turn_off_screen();
-void itemaction_turn_on_screen();
-
 #endif
