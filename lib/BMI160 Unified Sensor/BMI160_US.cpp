@@ -22,7 +22,7 @@ bool BMI160_US_Accelerometer::getEvent(sensors_event_t* event) {
 
 void BMI160_US_Accelerometer::getSensor(sensor_t* sensor) {
     memset(sensor, 0, sizeof(sensor_t));
-    strncpy(sensor->name, "BMI160", sizeof(sensor->name) - 1);
+    strncpy(sensor->name, "BMI160_A", sizeof(sensor->name) - 1);
     
     float range_g = BMI160.getAccelerometerRange();
     float max_val = range_g * 9.80665f;
@@ -57,7 +57,7 @@ bool BMI160_US_Gyroscope::getEvent(sensors_event_t* event) {
 
 void BMI160_US_Gyroscope::getSensor(sensor_t* sensor) {
     memset(sensor, 0, sizeof(sensor_t));
-    strncpy(sensor->name, "BMI160", sizeof(sensor->name) - 1);
+    strncpy(sensor->name, "BMI160_G", sizeof(sensor->name) - 1);
 
     float range_dps = BMI160.getGyroRange();
     float max_val = range_dps * (PI / 180.0f);

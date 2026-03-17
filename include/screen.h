@@ -5,8 +5,6 @@
 
 class Action;
 class Adafruit_Sensor;
-class Adafruit_BMP280;
-class Adafruit_AHTX0;
 
 class Screen {
 protected:
@@ -23,25 +21,15 @@ public:
     void request_redraw();
 };
 
-class BMP280View: public Screen {
+class SensorView: public Screen {
 private:
-    Adafruit_BMP280 &bmp280;
-public:
-    BMP280View(Adafruit_BMP280 &sensor);
-    void process_navigation(
-        unsigned long button_select_press_time,
-        bool button_up_clicked,
-        bool button_down_clicked
-    ) override;
-    void draw(U8G2 &u8g2) override;
-    bool is_menu() override;
-};
+    Adafruit_Sensor **sensor_ptr;
 
-class AHTX0View: public Screen {
-private:
-    Adafruit_AHTX0 &bmp280;
+    char sensor_name[32];
+    int32_t sensor_type;
+    bool initialized = false;
 public:
-    AHTX0View(Adafruit_AHTX0 &sensor);
+    SensorView(Adafruit_Sensor **sensor_ptr);
     void process_navigation(
         unsigned long button_select_press_time,
         bool button_up_clicked,
