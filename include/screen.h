@@ -8,6 +8,8 @@ class Action;
 class DummyAction;
 class Adafruit_Sensor;
 
+extern void open_notification(std::string message);
+
 class Screen {
 public:
     bool redraw_request = false;
@@ -78,9 +80,11 @@ public:
 class RadioMenu: public Menu {
 private:
     int radio_state = 0;
+    int &bound_target;
+    const int *value_map;
 
 public:
-    RadioMenu(DummyAction **items, unsigned item_count);
+    RadioMenu(DummyAction **items, int &bound_target, const int *value_map, unsigned item_count);
     void process_navigation(
         unsigned long button_select_press_duration,
         bool button_up_clicked,

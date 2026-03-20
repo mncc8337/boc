@@ -4,6 +4,7 @@
 
 #include <sensors.h>
 #include <ui_layout.h>
+#include <connectivity.h>
 
 #define SDA_PIN 8
 #define SCL_PIN 9
@@ -14,19 +15,13 @@
 
 #define BATTERY_PIN 0
 
-enum BroascastType {
-    NOT_BROASCASTING,
-    BLE_BEACON,
-    BLE_SERVER,
-    WIFI,
-};
-
 bool button_up_clicked = false;
 bool button_select_clicked = false;
 bool button_down_clicked = false;
 
 bool broadcasting = false;
-BroascastType broascast_type = NOT_BROASCASTING;
+BroadcastType broadcast_type = BLE_BEACON;
+BroadcastType new_broadcast_type = BLE_BEACON;
 
 bool screen_off = false;
 bool statusbar_redraw = false;
@@ -156,13 +151,15 @@ void setup() {
     u8g2.setColorIndex(1);
     u8g2.begin();
     u8g2.setBitmapMode(1);
+    u8g2.clear();
 
     if(!init_sensors()) {
         u8g2.printf("failed to init some sensors");
         while(1);
     }
 
-    u8g2.clearBuffer();
+    ble_init();
+
     current_screen = &main_menu;
     current_screen->request_redraw();
 }
@@ -216,7 +213,7 @@ void loop() {
         button_down_action = true;
     }
 
-    // actibity check
+    // activity check
     if(button_down_action || button_up_action || button_select_press_time) {
         idle_ts = millis();
         turn_on_screen();
@@ -226,6 +223,21 @@ void loop() {
     }
 
     update_state();
+
+    if(broadcasting) {
+        std::vector<uint8_t> data;
+        data.reserve(128);
+
+        pack_telemetry_payload(data);
+
+        switch(broadcast_type) {
+            case BLE_BEACON: {
+                ble_beacon_set_data(data);
+                break;
+            }
+            default:;
+        }
+    }
 
     if(!screen_off) {
         current_screen->process_navigation(

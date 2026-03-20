@@ -2,8 +2,10 @@
 #include <action.h>
 #include <bitmap.h>
 
-RadioMenu::RadioMenu(DummyAction **items, unsigned item_count)
-    : Menu((Action**)items, item_count) {}
+RadioMenu::RadioMenu(DummyAction **items, int &bound_target, const int *value_map, unsigned item_count)
+    : Menu((Action**)items, item_count),
+      bound_target(bound_target),
+      value_map(value_map) {}
 
 void RadioMenu::process_navigation(
     unsigned long button_select_press_duration,
@@ -14,6 +16,7 @@ void RadioMenu::process_navigation(
 
     if(button_select_press_duration > 50) {
         radio_state = item_selected;
+        bound_target = value_map[radio_state];
         redraw_request = true;
     }
 }

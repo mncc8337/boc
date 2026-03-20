@@ -34,7 +34,7 @@ bool init_sensors() {
         BMI160.setGyroRange(1000);
     }
 
-    sensors[SENS_BMP280_TEMPERATURE] = bmp280.getTemperatureSensor();
+    // sensors[SENS_BMP280_TEMPERATURE] = bmp280.getTemperatureSensor();
     sensors[SENS_BMP280_PRESSURE] = bmp280.getPressureSensor();
     sensors[SENS_AHTX0_TEMPERATURE] = ahtx0.getTemperatureSensor();
     sensors[SENS_AHTX0_HUMIDITY] = ahtx0.getHumiditySensor();
@@ -70,4 +70,47 @@ void unset_low_power_sensor_mode() {
     bh1750_hw.configure(BH1750::CONTINUOUS_HIGH_RES_MODE_2);
     BMI160.setRegister(0x7E, 0x11); delay(50);
     BMI160.setRegister(0x7E, 0x15); delay(50);
+}
+
+void pack_telemetry_payload(std::vector<uint8_t>& payload) {
+    for(int i = 0; i < SENS_COUNT; i++) {
+        sensor_t sensor_info;
+        sensors[i]->getSensor(&sensor_info);
+        
+        sensors_event_t event;
+        sensors[i]->getEvent(&event);
+        
+        uint8_t type = (uint8_t)sensor_info.type;
+        payload.push_back(type);
+
+        uint64_t value_to_send;
+        unsigned byte_size;
+        switch(type) {
+            case SENSOR_TYPE_AMBIENT_TEMPERATURE:
+                value_to_send = event.temperature * 100 + 0.5f;
+                byte_size = 2;
+                break;
+            case SENSOR_TYPE_RELATIVE_HUMIDITY:
+                value_to_send = event.relative_humidity * 100 + 0.5f;
+                byte_size = 2;
+                break;
+            case SENSOR_TYPE_PRESSURE:
+                value_to_send = event.pressure * 10 + 0.5f;
+                byte_size = 2;
+                break;
+            case SENSOR_TYPE_LIGHT:
+                value_to_send = event.light + 0.5f;
+                byte_size = 2;
+                break;
+            default:
+                value_to_send = event.data[0];
+                byte_size = 2;
+        }
+
+        for(unsigned i = 0; i < byte_size; i++) {
+            payload.push_back((uint8_t)(value_to_send >> (i * 8)));
+        }
+    }
+
+    // payload.push_back(0xFE);
 }

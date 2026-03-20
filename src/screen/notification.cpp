@@ -3,6 +3,12 @@
 #include <action.h>
 #include <bitmap.h>
 
+extern void open_prev_screen();
+extern void open_screen(Screen *screen);
+
+// global notification object
+static Notification notif("12345678901234567890"); // reserve 20 bytes
+
 Notification::Notification(std::string message) : message(message) {};
 
 void Notification::set_message(std::string new_message) {
@@ -15,7 +21,6 @@ void Notification::process_navigation(
     bool button_down_clicked
 ) {
     if(button_select_press_duration > 50 || button_down_clicked || button_down_clicked) {
-        extern void open_prev_screen();
         open_prev_screen();
     }
 }
@@ -50,4 +55,9 @@ void Notification::draw(U8G2 &u8g2, int offset_y) {
 
 bool Notification::is_overlay() {
     return true;
+}
+
+void open_notification(std::string message) {
+    notif.set_message(message);
+    open_screen(&notif);
 }

@@ -3,7 +3,7 @@
 #include <action.h>
 #include <U8g2lib.h>
 #include <sensors.h>
-#include <ble.h>
+#include <connectivity.h>
 
 extern bool broadcasting;
 extern U8G2 u8g2;
@@ -17,31 +17,52 @@ DummyAction *CONNECTIVITY_MENU_ITEMS[] = {
     &ble_server_option,
     &wifi_option
 };
+const int connectivity_menu_item_map[] = {
+    BLE_BEACON,
+    BLE_SERVER,
+    WIFI,
+};
+extern BroadcastType new_broadcast_type;
 RadioMenu connectivity_menu(
     CONNECTIVITY_MENU_ITEMS,
+    (int&)new_broadcast_type,
+    connectivity_menu_item_map,
     sizeof(CONNECTIVITY_MENU_ITEMS) / sizeof(Action*)
 );
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
-Notification broadcast_notification("Started\nbroadcasting");
-
 void itemaction_broadcast() {
     extern FunctionAction broadcast;
-    extern void open_screen(Screen *screen);
+    extern BroadcastType broadcast_type;
 
     if(broadcasting) {
-        ble_stop();
+        switch(broadcast_type) {
+            case BLE_BEACON: {
+                ble_beacon_stop();
+                break;
+            }
+            default: return; // not gonna happened
+        };
+
         broadcast.set_name("Broadcast");
-        broadcast_notification.set_message("Stopped\nbroadcasting");
+        open_notification("Stopped\nbroadcasting");
         broadcasting = false;
+        broadcast_type = new_broadcast_type;
     } else {
-        ble_beacon_start();
+        switch(broadcast_type) {
+            case BLE_BEACON: {
+                ble_beacon_start();
+                break;
+            }
+            default: {
+                open_notification("Unsupported\nconnectivity");
+                return;
+            }
+        }
         broadcast.set_name("Broadcasting");
-        broadcast_notification.set_message("Started\nbroadcasting");
+        open_notification("Started\nbroadcasting");
         broadcasting = true;
     }
-
-    open_screen(&broadcast_notification);
 }
 FunctionAction broadcast("Broadcast", itemaction_broadcast);
 
@@ -65,8 +86,8 @@ Menu settings_menu(
 OpenScreenAction open_settings_menu("Settings", &settings_menu);
 
 // bmp280 view
-SensorView bmp280_temperature_view(&sensors[SENS_BMP280_TEMPERATURE]);
-OpenScreenAction open_bmp280_temperature_view("BMP280 Temp", &bmp280_temperature_view);
+// SensorView bmp280_temperature_view(&sensors[SENS_BMP280_TEMPERATURE]);
+// OpenScreenAction open_bmp280_temperature_view("BMP280 Temp", &bmp280_temperature_view);
 SensorView bmp280_pressure_view(&sensors[SENS_BMP280_PRESSURE]);
 OpenScreenAction open_bmp280_pressure_view("BMP280 Press", &bmp280_pressure_view);
 
@@ -88,7 +109,7 @@ OpenScreenAction open_bmi160_gyroscope_view("BMI160 Gyro", &bmi160_gyroscope_vie
 
 // sensor menu
 Action *SENSOR_DATA_MENU_ITEMS[] = {
-    &open_bmp280_temperature_view,
+    // &open_bmp280_temperature_view,
     &open_bmp280_pressure_view,
     &open_ahtx0_temperature_view,
     &open_ahtx0_humidity_view,

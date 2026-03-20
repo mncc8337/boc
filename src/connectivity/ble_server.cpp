@@ -1,39 +1,11 @@
-#include <ble.h>
+#include <connectivity.h>
 #include <NimBLEDevice.h>
 #include <NimBLEUtils.h>
 #include <NimBLEServer.h>
 
-NimBLEServer* ble_server = nullptr;
-NimBLECharacteristic* temp_characteristic = nullptr;
-NimBLECharacteristic* bat_characteristic = nullptr;
-
-void ble_beacon_start() {
-    NimBLEDevice::init("SBOX");
-    
-    NimBLEAdvertising *advertising = NimBLEDevice::getAdvertising();
-    NimBLEAdvertisementData advertisement_data = NimBLEAdvertisementData();
-
-    advertisement_data.setFlags(0x04); 
-    advertisement_data.setName("SBOX");
-
-    std::string manufacturer_data(4, 0);
-
-    // manufacturer data
-    manufacturer_data[0] = (char)0xFF;
-    manufacturer_data[1] = (char)0xFF;
-    
-    // sensors data
-    manufacturer_data[2] = (char)12;
-    manufacturer_data[3] = (char)25;
-
-    advertisement_data.setManufacturerData(manufacturer_data);
-    advertising->setAdvertisementData(advertisement_data);
-
-    advertising->setMinInterval(0x100);
-    advertising->setMaxInterval(0x120);
-
-    advertising->start();
-}
+static NimBLEServer* ble_server = nullptr;
+static NimBLECharacteristic* temp_characteristic = nullptr;
+static NimBLECharacteristic* bat_characteristic = nullptr;
 
 void ble_server_start() {
     NimBLEDevice::init("SBOX"); 
@@ -69,6 +41,3 @@ void ble_server_start() {
     advertising->start();
 }
 
-void ble_stop() {
-    NimBLEDevice::deinit(true);
-}
