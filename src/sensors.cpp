@@ -1,8 +1,8 @@
-#include "BH1750.h"
 #include <sensors.h>
 #include <BH1750_US.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
+#include <BH1750.h>
 #include <BMI160_US.h>
 
 Adafruit_BMP280 bmp280;
@@ -34,10 +34,9 @@ bool init_sensors() {
         BMI160.setGyroRange(1000);
     }
 
-    // sensors[SENS_BMP280_TEMPERATURE] = bmp280.getTemperatureSensor();
-    sensors[SENS_BMP280_PRESSURE] = bmp280.getPressureSensor();
     sensors[SENS_AHTX0_TEMPERATURE] = ahtx0.getTemperatureSensor();
     sensors[SENS_AHTX0_HUMIDITY] = ahtx0.getHumiditySensor();
+    sensors[SENS_BMP280_PRESSURE] = bmp280.getPressureSensor();
     sensors[SENS_BH1750] = &bh1750;
     sensors[SENS_BMI160_ACCELERATION] = &bmi160_accel;
     sensors[SENS_BMI160_GYROSCOPE] = &bmi160_gyro;
@@ -72,45 +71,39 @@ void unset_low_power_sensor_mode() {
     BMI160.setRegister(0x7E, 0x15); delay(50);
 }
 
-void pack_telemetry_payload(std::vector<uint8_t>& payload) {
-    for(int i = 0; i < SENS_COUNT; i++) {
-        sensor_t sensor_info;
-        sensors[i]->getSensor(&sensor_info);
+void get_sensors_data(sensors_data_t &data) {
+    sensors_event_t event;
+    data.active_mask = 0;
+
+    for(unsigned i = 0; i < SENS_COUNT; i++) {
+        if (sensors[i] == nullptr) continue;
         
-        sensors_event_t event;
         sensors[i]->getEvent(&event);
-        
-        uint8_t type = (uint8_t)sensor_info.type;
-        payload.push_back(type);
+        data.active_mask |= (1 << i);
 
-        uint64_t value_to_send;
-        unsigned byte_size;
-        switch(type) {
-            case SENSOR_TYPE_AMBIENT_TEMPERATURE:
-                value_to_send = event.temperature * 100 + 0.5f;
-                byte_size = 2;
+        switch(i) {
+            case SENS_AHTX0_TEMPERATURE:
+                data.temperature = event.temperature;
                 break;
-            case SENSOR_TYPE_RELATIVE_HUMIDITY:
-                value_to_send = event.relative_humidity * 100 + 0.5f;
-                byte_size = 2;
+            case SENS_AHTX0_HUMIDITY:
+                data.humidity = event.relative_humidity;
                 break;
-            case SENSOR_TYPE_PRESSURE:
-                value_to_send = event.pressure * 10 + 0.5f;
-                byte_size = 2;
+            case SENS_BMP280_PRESSURE:
+                data.pressure = event.pressure;
                 break;
-            case SENSOR_TYPE_LIGHT:
-                value_to_send = event.light + 0.5f;
-                byte_size = 2;
+            case SENS_BH1750:
+                data.light = event.light;
                 break;
-            default:
-                value_to_send = event.data[0];
-                byte_size = 2;
-        }
-
-        for(unsigned i = 0; i < byte_size; i++) {
-            payload.push_back((uint8_t)(value_to_send >> (i * 8)));
+            case SENS_BMI160_ACCELERATION: 
+                data.accel[0] = event.acceleration.x;
+                data.accel[1] = event.acceleration.y;
+                data.accel[2] = event.acceleration.z;
+                break;
+            case SENS_BMI160_GYROSCOPE:
+                data.gyro[0] = event.gyro.x;
+                data.gyro[1] = event.gyro.y;
+                data.gyro[2] = event.gyro.z;
+                break;
         }
     }
-
-    // payload.push_back(0xFE);
 }

@@ -1,4 +1,5 @@
 import asyncio
+import struct
 from enum import IntEnum
 from bleak import BleakScanner
 
@@ -38,6 +39,7 @@ MULTIPLIER_MAP = {
     SensorType.AMBIENT_TEMPERATURE: 0.01,
     SensorType.RELATIVE_HUMIDITY: 0.01,
     SensorType.PRESSURE: 0.1,
+    SensorType.LIGHT: 1,
 }
 
 UNIT_MAP = {
@@ -45,7 +47,8 @@ UNIT_MAP = {
     SensorType.RELATIVE_HUMIDITY: "%",
     SensorType.PRESSURE: "hPa",
     SensorType.LIGHT: "Lux",
-    SensorType.CO2: "ppm",
+    SensorType.ACCELEROMETER: "m/s2",
+    SensorType.GYROSCOPE: "rad/s"
 }
 
 def parse_payload(raw_data):
@@ -57,22 +60,32 @@ def parse_payload(raw_data):
             s_type_val = raw_data[i]
             i += 1
             
-            if i + 1 < len(raw_data):
-                raw_val = raw_data[i] | (raw_data[i+1] << 8)
-                i += 2
-                
-                try:
-                    s_type = SensorType(s_type_val)
+            try:
+                s_type = SensorType(s_type_val)
+            except ValueError:
+                continue 
+
+            if s_type in (SensorType.ACCELEROMETER, SensorType.GYROSCOPE):
+                if i + 6 <= len(raw_data):
+                    x, y, z = struct.unpack_from('<hhh', raw_data, i)
+                    i += 6
+                    
+                    results[s_type.name] = f"X:{x/100:.2f} Y:{y/100:.2f} Z:{z/100:.2f} {UNIT_MAP.get(s_type, '')}"
+                else:
+                    break
+                    
+            else:
+                if i + 2 <= len(raw_data):
+                    raw_val, = struct.unpack_from('<h', raw_data, i)
+                    i += 2
+                    
                     multiplier = MULTIPLIER_MAP.get(s_type, 1.0)
                     final_val = round(raw_val * multiplier, 2)
                     
-                    name = s_type.name
-                    unit = UNIT_MAP.get(s_type, "")
-                    results[name] = f"{final_val} {unit}"
-                except ValueError:
-                    results[f"UNKNOWN_{s_type_val}"] = raw_val
-            else:
-                break
+                    results[s_type.name] = f"{final_val} {UNIT_MAP.get(s_type, '')}"
+                else:
+                    break
+                    
         except IndexError:
             break
             
@@ -81,26 +94,25 @@ def parse_payload(raw_data):
 def detection_callback(device, advertisement_data):
     if advertisement_data.local_name == "SBOX":
         all_raw = bytearray()
-        sorted_m_data = sorted(advertisement_data.manufacturer_data.items())
-        
-        for company_id, data in sorted_m_data:
-            all_raw.extend(company_id.to_bytes(2, byteorder='little'))
-            all_raw.extend(data)
+        for company_id, data in advertisement_data.manufacturer_data.items():
+            single_raw = bytearray()
+            single_raw.extend(company_id.to_bytes(2, byteorder='little'))
+            single_raw.extend(data)
+            all_raw += single_raw
             
-        if all_raw:
-            print(f"\n[SBOX RX] Address: {device.address} | RSSI: {advertisement_data.rssi} dBm")
-            print(f"RAW HEX: {all_raw.hex().upper()}")
+        decoded = parse_payload(all_raw)
             
-            decoded = parse_payload(all_raw)
+        if decoded:
+            print(f"\n[+] CATCHED | MAC: {device.address} | RSSI: {advertisement_data.rssi} dBm")
             for sensor, value in decoded.items():
-                print(f"  {sensor:20}: {value}")
+                print(f"    -> {sensor:20}: {value}")
 
 async def main():
-    print("--- SBOX BLE BEACON RECEIVER STARTED ---")
-
     scanner = BleakScanner(
         detection_callback, 
-        scanning_mode="active"
+        scanning_mode="active",
+        duplicate_value=True
+        # adapter="hci0"
     )
 
     await scanner.start()
@@ -116,4 +128,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nSBOX BLE Beacon Receiver stopped.")
+        pass

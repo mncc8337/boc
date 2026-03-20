@@ -20,8 +20,8 @@ bool button_select_clicked = false;
 bool button_down_clicked = false;
 
 bool broadcasting = false;
-BroadcastType broadcast_type = BLE_BEACON;
-BroadcastType new_broadcast_type = BLE_BEACON;
+BroadcastType broadcast_type = BLE_SERVER;
+BroadcastType new_broadcast_type = BLE_SERVER;
 
 bool screen_off = false;
 bool statusbar_redraw = false;
@@ -92,26 +92,59 @@ void turn_on_screen() {
 const unsigned VOLTAGE_HISTORY_SIZE = 16;
 uint32_t psu_voltage_history[VOLTAGE_HISTORY_SIZE];
 uint32_t psu_voltage_sum = 0;
+uint8_t battery_percentage = 0;
 #define PSU_VOLTAGE (psu_voltage_sum / VOLTAGE_HISTORY_SIZE)
 
-void update_psu_voltage() {
+void update_battery_readings() {
     uint32_t raw = analogReadMilliVolts(BATTERY_PIN) * 2;
 
     static uint32_t history_ptr = 0;
     psu_voltage_sum += - psu_voltage_history[history_ptr] + raw;
     psu_voltage_history[history_ptr++] = raw;
     history_ptr %= VOLTAGE_HISTORY_SIZE;
+
+    uint16_t mvolts = PSU_VOLTAGE;
+    if(mvolts >= 4150) 
+        battery_percentage = 100;
+    else if(mvolts > 3800)
+        battery_percentage = (uint8_t)(70 + (((uint32_t)(mvolts - 3800) * 19) >> 8));
+    else if(mvolts > 3600)
+        battery_percentage = (uint8_t)(20 + ((mvolts - 3600) >> 2));
+    else if(mvolts > 3400)
+        battery_percentage = (uint8_t)(((uint32_t)(mvolts - 3400) * 26) >> 8);
 }
 
 void update_state() {
     program_tick++;
-    if(program_tick >= (1 << 10)) {
-        program_tick = 0;
+    if(!(program_tick % (1 << 10))) {
 
-        update_psu_voltage();
+        update_battery_readings();
+        if(PSU_VOLTAGE < 3400)
+            esp_deep_sleep_start();
 
         statusbar_redraw = true;
+
     }
+    if(!(program_tick % (1 << 4)) && broadcasting) {
+        sensors_data_t data;
+        get_sensors_data(data);
+        
+        switch(broadcast_type) {
+            case BLE_BEACON: {
+                std::vector<uint8_t> payload; payload.reserve(64);
+                make_ble_beacon_payload(data, payload);
+                ble_beacon_set_data(payload);
+                break;
+            }
+            case BLE_SERVER: {
+                ble_server_update(data, battery_percentage);
+                break;
+            }
+            default:;
+        }
+    }
+
+    program_tick %= (1<<10);
 }
 
 void clear_statusbar() {
@@ -123,7 +156,11 @@ void clear_statusbar() {
 void draw_statusbar() {
     u8g2.setFont(u8g2_font_4x6_mf);
 
-    u8g2.setCursor(0, 5); u8g2.printf("%4dmV", PSU_VOLTAGE);
+    u8g2.setCursor(0, 5); u8g2.printf("BAT %4dmV %2d%%", PSU_VOLTAGE, battery_percentage);
+    if(broadcasting) {
+        u8g2.setCursor(128 - 12 * 3 - 11, 5);
+        u8g2.print("BROADCASTING");
+    }
 }
 
 void draw_frame() {
@@ -144,7 +181,7 @@ void setup() {
     pinMode(BATTERY_PIN, INPUT);
 
     for(unsigned i = 0; i < VOLTAGE_HISTORY_SIZE; i++)
-        update_psu_voltage();
+        update_battery_readings();
 
     Wire.begin(SDA_PIN, SCL_PIN);
 
@@ -223,21 +260,6 @@ void loop() {
     }
 
     update_state();
-
-    if(broadcasting) {
-        std::vector<uint8_t> data;
-        data.reserve(128);
-
-        pack_telemetry_payload(data);
-
-        switch(broadcast_type) {
-            case BLE_BEACON: {
-                ble_beacon_set_data(data);
-                break;
-            }
-            default:;
-        }
-    }
 
     if(!screen_off) {
         current_screen->process_navigation(

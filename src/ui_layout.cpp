@@ -13,13 +13,13 @@ DummyAction ble_beacon_option("BLE Beacon");
 DummyAction ble_server_option("BLE Server");
 DummyAction wifi_option("WiFi");
 DummyAction *CONNECTIVITY_MENU_ITEMS[] = {
-    &ble_beacon_option,
     &ble_server_option,
+    &ble_beacon_option,
     &wifi_option
 };
 const int connectivity_menu_item_map[] = {
-    BLE_BEACON,
     BLE_SERVER,
+    BLE_BEACON,
     WIFI,
 };
 extern BroadcastType new_broadcast_type;
@@ -41,6 +41,10 @@ void itemaction_broadcast() {
                 ble_beacon_stop();
                 break;
             }
+            case BLE_SERVER: {
+                ble_server_stop();
+                break;
+            }
             default: return; // not gonna happened
         };
 
@@ -49,9 +53,14 @@ void itemaction_broadcast() {
         broadcasting = false;
         broadcast_type = new_broadcast_type;
     } else {
+        broadcast_type = new_broadcast_type;
         switch(broadcast_type) {
             case BLE_BEACON: {
                 ble_beacon_start();
+                break;
+            }
+            case BLE_SERVER: {
+                ble_server_start();
                 break;
             }
             default: {
@@ -85,17 +94,17 @@ Menu settings_menu(
 );
 OpenScreenAction open_settings_menu("Settings", &settings_menu);
 
-// bmp280 view
-// SensorView bmp280_temperature_view(&sensors[SENS_BMP280_TEMPERATURE]);
-// OpenScreenAction open_bmp280_temperature_view("BMP280 Temp", &bmp280_temperature_view);
-SensorView bmp280_pressure_view(&sensors[SENS_BMP280_PRESSURE]);
-OpenScreenAction open_bmp280_pressure_view("BMP280 Press", &bmp280_pressure_view);
-
 // ahtx0 view
 SensorView ahtx0_temperature_view(&sensors[SENS_AHTX0_TEMPERATURE]);
 OpenScreenAction open_ahtx0_temperature_view("AHTx0 Temp", &ahtx0_temperature_view);
 SensorView ahtx0_humidity_view(&sensors[SENS_AHTX0_HUMIDITY]);
 OpenScreenAction open_ahtx0_humidity_view("AHTx0 Humid", &ahtx0_humidity_view);
+
+// bmp280 view
+// SensorView bmp280_temperature_view(&sensors[SENS_BMP280_TEMPERATURE]);
+// OpenScreenAction open_bmp280_temperature_view("BMP280 Temp", &bmp280_temperature_view);
+SensorView bmp280_pressure_view(&sensors[SENS_BMP280_PRESSURE]);
+OpenScreenAction open_bmp280_pressure_view("BMP280 Press", &bmp280_pressure_view);
 
 // bh1750 view
 SensorView bh1750_view(&sensors[SENS_BH1750]);
@@ -110,9 +119,9 @@ OpenScreenAction open_bmi160_gyroscope_view("BMI160 Gyro", &bmi160_gyroscope_vie
 // sensor menu
 Action *SENSOR_DATA_MENU_ITEMS[] = {
     // &open_bmp280_temperature_view,
-    &open_bmp280_pressure_view,
     &open_ahtx0_temperature_view,
     &open_ahtx0_humidity_view,
+    &open_bmp280_pressure_view,
     &open_bh1750_view,
     &open_bmi160_acceleration_view,
     &open_bmi160_gyroscope_view,
