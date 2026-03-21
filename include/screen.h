@@ -58,7 +58,7 @@ private:
     unsigned axis = 0;
     bool auto_scaling = false;
 
-    unsigned long sample_interval = 50;
+    unsigned long sample_interval_ms = 50;
     unsigned long last_sampling_ts = 0;
 public:
     SensorView(Adafruit_Sensor &sensor);
@@ -97,6 +97,19 @@ private:
 
 public:
     RadioMenu(std::vector<DummyAction*> &items, int &bound_target, std::vector<int> value_map);
+    void process_navigation(
+        unsigned long button_select_press_duration,
+        bool button_up_clicked,
+        bool button_down_clicked
+    ) override;
+    void draw(U8G2 &u8g2) override;
+};
+
+class InfoScreen : public Screen {
+private:
+    unsigned long last_update_ts = 0;
+    int current_y = 6;
+public:
     void process_navigation(
         unsigned long button_select_press_duration,
         bool button_up_clicked,

@@ -94,28 +94,34 @@ void turn_on_screen() {
 }
 
 const unsigned VOLTAGE_HISTORY_SIZE = 16;
-uint32_t psu_voltage_history[VOLTAGE_HISTORY_SIZE];
+uint32_t psu_voltage_history[VOLTAGE_HISTORY_SIZE] = {0};
 uint32_t psu_voltage_sum = 0;
+uint16_t psu_voltage_avg = 0;
 uint8_t battery_percentage = 0;
-#define PSU_VOLTAGE (psu_voltage_sum / VOLTAGE_HISTORY_SIZE)
 
 void update_battery_readings() {
     uint32_t raw = analogReadMilliVolts(BATTERY_PIN) * 2;
-
     static uint32_t history_ptr = 0;
-    psu_voltage_sum += - psu_voltage_history[history_ptr] + raw;
+
+    psu_voltage_sum = psu_voltage_sum - psu_voltage_history[history_ptr] + raw;
     psu_voltage_history[history_ptr++] = raw;
     history_ptr %= VOLTAGE_HISTORY_SIZE;
 
-    uint16_t mvolts = PSU_VOLTAGE;
-    if(mvolts >= 4150) 
+    psu_voltage_avg = psu_voltage_sum / VOLTAGE_HISTORY_SIZE;
+
+    if(psu_voltage_avg >= 4150) {
         battery_percentage = 100;
-    else if(mvolts > 3800)
-        battery_percentage = (uint8_t)(70 + (((uint32_t)(mvolts - 3800) * 19) >> 8));
-    else if(mvolts > 3600)
-        battery_percentage = (uint8_t)(20 + ((mvolts - 3600) >> 2));
-    else if(mvolts > 3400)
-        battery_percentage = (uint8_t)(((uint32_t)(mvolts - 3400) * 26) >> 8);
+    } else if(psu_voltage_avg > 3750) {
+        battery_percentage = 80 + (uint8_t)((psu_voltage_avg - 3750) / 20);
+    } else if(psu_voltage_avg > 3650) {
+        battery_percentage = 20 + (uint8_t)(((psu_voltage_avg - 3650) * 3) / 5);
+    } else if(psu_voltage_avg > 3500) {
+        battery_percentage = 10 + (uint8_t)((psu_voltage_avg - 3500) / 15);
+    } else if(psu_voltage_avg > 3200) {
+        battery_percentage = (uint8_t)((psu_voltage_avg - 3200) / 30);
+    } else {
+        battery_percentage = 0;
+    }
 }
 
 void update_state() {
@@ -123,7 +129,7 @@ void update_state() {
     if(!(program_tick % (1 << 10))) {
 
         update_battery_readings();
-        if(PSU_VOLTAGE < 3400)
+        if(psu_voltage_avg < 3400)
             esp_deep_sleep_start();
     }
     if(!(program_tick % (1 << 4)) && broadcasting) {

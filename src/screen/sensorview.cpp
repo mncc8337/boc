@@ -52,10 +52,10 @@ void SensorView::process_navigation(
                     axis %= 3;
                 }
             } else if(button_down_clicked) {
-                if(sample_interval > 50)
-                    sample_interval -= 10;
+                if(sample_interval_ms > 50)
+                    sample_interval_ms -= 10;
             } else {
-                sample_interval += 10;
+                sample_interval_ms += 10;
             }
     }
 
@@ -72,37 +72,39 @@ void SensorView::draw(U8G2 &u8g2) {
         sensor.getEvent(&event);
         float *data = event.data;
 
+        int y = 9;
+
+        u8g2.setFont(u8g2_font_tenthinnerguys_tf);
+        u8g2.setCursor(0, y); u8g2.print(sensor_name);
+        y += 7 + 2;
+
+        u8g2.setFont(u8g2_font_tiny5_tf);
+        u8g2.setCursor(0, y);
+        u8g2.print(get_sensor_type_string(sensor_type));
+        y += 12 + 2;
+
         u8g2.setFont(u8g2_font_glasstown_nbp_tf);
-        const int FONT_HEIGHT = 12;
-        int y = FONT_HEIGHT;
-
-        u8g2.setCursor(0, y); u8g2.printf("Name: %s", sensor_name); y += FONT_HEIGHT;
-        // u8g2.setCursor(0, y); u8g2.printf("ID: %d", event.sensor_id); y += FONT_HEIGHT;
-        // u8g2.setCursor(0, y); u8g2.printf("TS: %d", event.timestamp); y += FONT_HEIGHT;
-
-        u8g2.setCursor(0, y);
-        u8g2.printf("Type: %s", get_sensor_type_string(sensor_type)); y += FONT_HEIGHT;
-        u8g2.setCursor(0, y);
+        u8g2.setCursor(8, y); u8g2.printf("TS: %d", event.timestamp); y += 12;
 
         if(!multi_axis) {
-            u8g2.setCursor(0, y);
+            u8g2.setCursor(8, y);
             u8g2.printf("Val: %.2f %s", data[0], get_sensor_unit_string(sensor_type));
-            y += FONT_HEIGHT;
+            y += 12;
         } else {
-            u8g2.setCursor(0, y);
+            u8g2.setCursor(8, y);
             u8g2.printf("Unit: %s", get_sensor_unit_string(sensor_type));
-            y += FONT_HEIGHT;
-            u8g2.setCursor(0, y);
+            y += 12;
+            u8g2.setCursor(8, y);
             u8g2.printf(
                 "Val: x.%.2f y.%.2f z.%.2f",
                 data[0],
                 data[1],
                 data[2]
             );
-            y += FONT_HEIGHT;
+            y += 12;
         }
     } else {
-        if(millis() - last_sampling_ts >= sample_interval) {
+        if(millis() - last_sampling_ts >= sample_interval_ms) {
             sensor.getEvent(&event);
             graph_data[graph_data_pos++] = event.data[axis];
             graph_data_pos %= 127;
@@ -112,14 +114,14 @@ void SensorView::draw(U8G2 &u8g2) {
         const int FONT_HEIGHT = 6;
         if(!multi_axis) {
             u8g2.setCursor(0, FONT_HEIGHT);
-            u8g2.printf("%s | %dms", get_sensor_type_string(sensor_type), sample_interval);
+            u8g2.printf("%s | %dms", get_sensor_type_string(sensor_type), sample_interval_ms);
         } else {
             u8g2.setCursor(0, FONT_HEIGHT);
             u8g2.printf(
                 "%s, %c | %dms",
                 get_sensor_type_string(sensor_type),
                 axis == 0 ? 'x' : axis == 1 ? 'y' : 'z',
-                sample_interval
+                sample_interval_ms
             );
         }
         u8g2.setCursor(3, FONT_HEIGHT * 2);

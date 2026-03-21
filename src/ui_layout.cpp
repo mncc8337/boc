@@ -75,16 +75,14 @@ void itemaction_broadcast() {
 }
 FunctionAction broadcast("Broadcast", itemaction_broadcast);
 
-DummyAction open_battery_menu("Battery");
-
 DummyAction open_screen_menu("Screen");
 
-DummyAction open_info_menu("Info");
+InfoScreen info_screen_instance;
+OpenScreenAction open_info_menu("Info", &info_screen_instance);
 
 // system menu
 std::vector<Action*> settings_menu_items = {
     &open_connectivity_menu,
-    &open_battery_menu,
     &open_screen_menu,
     &open_info_menu,
 };
