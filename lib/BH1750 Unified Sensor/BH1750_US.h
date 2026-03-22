@@ -2,14 +2,16 @@
 #define BH1750_US_H
 
 #include <Adafruit_Sensor.h>
-#include <BH1750.h>
+#include <hp_BH1750.h>
 
 class BH1750_US : public Adafruit_Sensor {
 private:
-    BH1750 &sensor_hw;
+    hp_BH1750 &sensor_hw;
     int32_t sensor_id;
+
+    int last_raw = 0;
 public:
-    BH1750_US(BH1750 &hw, int32_t id);
+    BH1750_US(hp_BH1750 &hw, int32_t id);
 
     bool getEvent(sensors_event_t* event) override;
 

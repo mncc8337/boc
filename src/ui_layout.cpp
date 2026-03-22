@@ -1,3 +1,4 @@
+#include "esp_system.h"
 #include <ui_layout.h>
 #include <U8g2lib.h>
 #include <screen.h>
@@ -31,7 +32,7 @@ RadioMenu connectivity_menu(
 );
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
-void functionaction_broadcast() {
+void broadcast_func() {
     extern FunctionAction broadcast;
     extern BroadcastType broadcast_type;
 
@@ -73,18 +74,24 @@ void functionaction_broadcast() {
         broadcasting = true;
     }
 }
-FunctionAction broadcast("Broadcast", functionaction_broadcast);
+FunctionAction broadcast("Broadcast", broadcast_func);
 
 DummyAction open_screen_menu("Screen");
 
 InfoScreen info_screen_instance;
 OpenScreenAction open_info_menu("Info", &info_screen_instance);
 
+void reboot_func() {
+    esp_restart();
+}
+FunctionAction reboot("Reboot", reboot_func);
+
 // system menu
 std::vector<Action*> settings_menu_items = {
     &open_connectivity_menu,
     &open_screen_menu,
     &open_info_menu,
+    &reboot,
 };
 Menu settings_menu(settings_menu_items);
 OpenScreenAction open_settings_menu("Settings", &settings_menu);

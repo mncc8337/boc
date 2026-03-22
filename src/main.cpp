@@ -144,7 +144,6 @@ void setup() {
     Wire.begin(SDA_PIN, SCL_PIN);
 
     u8g2.begin();
-    u8g2.setBitmapMode(1);
 
     if(init_sensors() != (1 << SENS_COUNT) - 1) {
         u8g2.setFont(u8g2_font_4x6_tf);
@@ -163,10 +162,14 @@ void setup() {
     ble_init();
     ui_init();
 
-    // splash image
-    u8g2.drawXBMP(0, 0, 128, 64, BITMAP_SPLASH_IMAGE);
-    u8g2.sendBuffer();
-    delay(2000);
+    // splash images
+    u8g2.setBitmapMode(0);
+    for(unsigned i = 0; i < BITMAP_SPLASH_LEN * 3; i++) {
+        u8g2.drawXBMP(0, 0, 128, 64, BITMAP_SPLASH[i % BITMAP_SPLASH_LEN]);
+        u8g2.sendBuffer();
+        delay(10);
+    }
+    u8g2.setBitmapMode(1);
 
     current_screen = &main_menu;
     current_screen->request_redraw();

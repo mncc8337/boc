@@ -1,13 +1,13 @@
 #include <sensors.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
-#include <BH1750.h>
+#include <hp_BH1750.h>
 #include <BH1750_US.h>
 #include <BMI160_US.h>
 
 Adafruit_BMP280 bmp280;
 Adafruit_AHTX0 ahtx0;
-BH1750 bh1750_hw;
+hp_BH1750 bh1750_hw;
 BH1750_US bh1750(bh1750_hw, 1750);
 BMI160_US_Accelerometer bmi160_accel(160);
 BMI160_US_Gyroscope bmi160_gyro(161);
@@ -117,9 +117,11 @@ uint16_t init_sensors() {
         sensors[SENS_PRESSURE] = bmp280.getPressureSensor();
     }
 
-    if(bh1750_hw.begin(BH1750::CONTINUOUS_HIGH_RES_MODE_2, 0x23)) {
+    if(bh1750_hw.begin(0x23)) {
         sensor_mask |= 1 << SENS_LIGHT;
         sensors[SENS_LIGHT] = &bh1750;
+        bh1750_hw.calibrateTiming();
+        bh1750_hw.start(BH1750_QUALITY_HIGH2, 69);
     }
 
     if(BMI160.begin(BMI160GenClass::I2C_MODE, 0x69)) {
@@ -138,10 +140,7 @@ void sleep_sensors() {
     if(SENSOR_ALIVE(SENS_PRESSURE))
         bmp280.setSampling(Adafruit_BMP280::MODE_SLEEP);
 
-    if(SENSOR_ALIVE(SENS_LIGHT))
-        bh1750_hw.configure((BH1750::Mode)BH1750_POWER_DOWN);
-
-    // ahtx0 dont need to sleep
+    // ahtx0 and bh1750 dont need to sleep
     
     if(SENSOR_ALIVE(SENS_ACCELERATION)) {
         BMI160.setRegister(0x7E, 0x10); delay(50);
@@ -153,9 +152,6 @@ void wake_sensors() {
     if(SENSOR_ALIVE(SENS_PRESSURE))
         bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL);
 
-    if(SENSOR_ALIVE(SENS_LIGHT))
-        bh1750_hw.configure(BH1750::CONTINUOUS_HIGH_RES_MODE_2);
-
     if(SENSOR_ALIVE(SENS_ACCELERATION)) {
         BMI160.setRegister(0x7E, 0x11); delay(50);
         BMI160.setRegister(0x7E, 0x15); delay(50);
@@ -163,9 +159,6 @@ void wake_sensors() {
 }
 
 void set_low_power_sensor_mode() {
-    if(SENSOR_ALIVE(SENS_LIGHT))
-        bh1750_hw.configure(BH1750::ONE_TIME_HIGH_RES_MODE_2);
-
     if(SENSOR_ALIVE(SENS_ACCELERATION)) {
         BMI160.setRegister(0x7E, 0x10); delay(50);
         BMI160.setRegister(0x7E, 0x14); delay(50);
@@ -173,9 +166,6 @@ void set_low_power_sensor_mode() {
 }
 
 void unset_low_power_sensor_mode() {
-    if(SENSOR_ALIVE(SENS_LIGHT))
-        bh1750_hw.configure(BH1750::CONTINUOUS_HIGH_RES_MODE_2);
-
     if(SENSOR_ALIVE(SENS_ACCELERATION)) {
         BMI160.setRegister(0x7E, 0x11); delay(50);
         BMI160.setRegister(0x7E, 0x15); delay(50);

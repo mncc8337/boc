@@ -44,15 +44,12 @@ void SensorView::process_navigation(
 ) {
     if(graph_screen && (button_up_clicked || button_down_clicked)) {
             if(button_up_clicked && button_down_clicked) {
-                // clear
                 if(multi_axis) {
-                    memset(graph_data, 0, sizeof(graph_data));
-                    graph_data_pos = 0;
                     axis++;
                     axis %= 3;
                 }
             } else if(button_down_clicked) {
-                if(sample_interval_ms > 50)
+                if(sample_interval_ms > 20)
                     sample_interval_ms -= 10;
             } else {
                 sample_interval_ms += 10;
