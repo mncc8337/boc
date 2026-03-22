@@ -1,3 +1,4 @@
+#include "BMI160Gen.h"
 #include <sensors.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
@@ -10,10 +11,20 @@ Adafruit_AHTX0 ahtx0;
 hp_BH1750 bh1750_hw;
 BH1750_US bh1750(bh1750_hw, 1750);
 BMI160_US_Accelerometer bmi160_accel(160);
-BMI160_US_Gyroscope bmi160_gyro(161);
+BMI160_US_Gyroscope bmi160_gyro(160);
 
 Adafruit_Sensor *sensors[SENS_COUNT];
 uint16_t sensor_mask;
+
+Adafruit_BMP280::sensor_sampling bmp280_sampling = Adafruit_BMP280::SAMPLING_X16;
+Adafruit_BMP280::sensor_filter bmp280_filter = Adafruit_BMP280::FILTER_X4;
+Adafruit_BMP280::standby_duration bmp280_standby_duration = Adafruit_BMP280::STANDBY_MS_1;
+
+int bmi160_accel_range = BMI160_ACCEL_RANGE_2G;
+int bmi160_accel_odr = BMI160_ACCEL_RATE_100HZ;
+
+int bmi160_gyro_range = BMI160_GYRO_RANGE_2000;
+int bmi160_gyro_odr = BMI160_GYRO_RATE_50HZ;
 
 const char* get_sensor_type_string(const int &type) {
     switch(type) {
@@ -99,6 +110,16 @@ const char* get_sensor_unit_string(const int type) {
     }
 }
 
+static void bmi160_on() {
+    BMI160.setRegister(0x7E, 0x11); delay(50);
+    BMI160.setRegister(0x7E, 0x15); delay(50);
+}
+
+static void bmi160_off() {
+    BMI160.setRegister(0x7E, 0x10); delay(50);
+    BMI160.setRegister(0x7E, 0x14); delay(50);
+}
+
 uint16_t init_sensors() {
     sensor_mask = 0;
     for(int i = 0; i < SENS_COUNT; i++) {
@@ -115,6 +136,14 @@ uint16_t init_sensors() {
     if(bmp280.begin(0x77)) {
         sensor_mask |= 1 << SENS_PRESSURE;
         sensors[SENS_PRESSURE] = bmp280.getPressureSensor();
+
+        bmp280.setSampling(
+            Adafruit_BMP280::MODE_NORMAL,
+            Adafruit_BMP280::SAMPLING_X2,
+            bmp280_sampling,
+            bmp280_filter,
+            bmp280_standby_duration
+        );
     }
 
     if(bh1750_hw.begin(0x23)) {
@@ -125,12 +154,16 @@ uint16_t init_sensors() {
     }
 
     if(BMI160.begin(BMI160GenClass::I2C_MODE, 0x69)) {
-        BMI160.setFullScaleAccelRange(BMI160_ACCEL_RANGE_4G); 
-        BMI160.setGyroRange(1000);
         sensor_mask |= 1 << SENS_ACCELERATION;
         sensor_mask |= 1 << SENS_GYROSCOPE;
         sensors[SENS_ACCELERATION] = &bmi160_accel;
         sensors[SENS_GYROSCOPE] = &bmi160_gyro;
+        BMI160.setFullScaleAccelRange(bmi160_accel_range); 
+        BMI160.setAccelRate(bmi160_accel_odr);
+
+        BMI160.setFullScaleGyroRange(bmi160_gyro_range);
+        BMI160.setGyroRange(bmi160_gyro_range);
+        BMI160.setGyroRate(bmi160_gyro_odr);
     }
 
     return sensor_mask;
@@ -142,34 +175,26 @@ void sleep_sensors() {
 
     // ahtx0 and bh1750 dont need to sleep
     
-    if(SENSOR_ALIVE(SENS_ACCELERATION)) {
-        BMI160.setRegister(0x7E, 0x10); delay(50);
-        BMI160.setRegister(0x7E, 0x14); delay(50);
-    }
+    if(SENSOR_ALIVE(SENS_ACCELERATION))
+        bmi160_off();
 }
 
 void wake_sensors() {
     if(SENSOR_ALIVE(SENS_PRESSURE))
         bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL);
 
-    if(SENSOR_ALIVE(SENS_ACCELERATION)) {
-        BMI160.setRegister(0x7E, 0x11); delay(50);
-        BMI160.setRegister(0x7E, 0x15); delay(50);
-    }
+    if(SENSOR_ALIVE(SENS_ACCELERATION))
+        bmi160_on();
 }
 
 void set_low_power_sensor_mode() {
-    if(SENSOR_ALIVE(SENS_ACCELERATION)) {
-        BMI160.setRegister(0x7E, 0x10); delay(50);
-        BMI160.setRegister(0x7E, 0x14); delay(50);
-    }
+    if(SENSOR_ALIVE(SENS_ACCELERATION))
+        bmi160_off();
 }
 
 void unset_low_power_sensor_mode() {
-    if(SENSOR_ALIVE(SENS_ACCELERATION)) {
-        BMI160.setRegister(0x7E, 0x11); delay(50);
-        BMI160.setRegister(0x7E, 0x15); delay(50);
-    }
+    if(SENSOR_ALIVE(SENS_ACCELERATION))
+        bmi160_on();
 }
 
 void get_sensors_data(sensors_data_t &data) {

@@ -2,10 +2,16 @@
 #include <action.h>
 #include <bitmap.h>
 
-RadioMenu::RadioMenu(std::vector<DummyAction*> &items, int &bound_target, std::vector<int> value_map)
-    : Menu((std::vector<Action*> &)items),
+RadioMenu::RadioMenu(
+    std::vector<DummyAction*> &items,
+    int &bound_target,
+    std::vector<int> &value_map,
+    unsigned default_state
+)
+    : Menu((std::vector<Action*> &)items, default_state),
       bound_target(bound_target),
-      value_map(value_map) {}
+      value_map(value_map),
+      radio_state(default_state) {}
 
 void RadioMenu::process_navigation(
     unsigned long button_select_press_duration,

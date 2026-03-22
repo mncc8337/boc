@@ -22,6 +22,8 @@ BroadcastType new_broadcast_type = BLE_SERVER;
 
 bool sleep_lock = false;
 bool screen_off = false;
+unsigned long screen_timeout = 3 * 60000;
+uint8_t screen_brightness = 128;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0);
 
@@ -272,6 +274,7 @@ void loop() {
             if(!current_screen->is_overlay())
                 u8g2.clearBuffer();
             current_screen->draw(u8g2);
+            u8g2.setContrast(screen_brightness);
             u8g2.sendBuffer();
         }
     } else {
@@ -286,7 +289,7 @@ void loop() {
     if(button_down_action || button_up_action || button_select_press_time) {
         idle_ts = current_ts;
         turn_on_screen();
-    } else if(current_ts - idle_ts > 3 * 60000) {
+    } else if(current_ts - idle_ts > screen_timeout) {
         idle_ts = current_ts; // prevent sleeping again after waking up
         turn_off_screen();
     }

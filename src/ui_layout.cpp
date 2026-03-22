@@ -28,7 +28,8 @@ extern BroadcastType new_broadcast_type;
 RadioMenu connectivity_menu(
     connectivity_menu_items,
     (int&)new_broadcast_type,
-    connectivity_menu_item_map
+    connectivity_menu_item_map,
+    0
 );
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
@@ -76,38 +77,101 @@ void broadcast_func() {
 }
 FunctionAction broadcast("Broadcast", broadcast_func);
 
-DummyAction open_screen_menu("Screen");
+DummyAction open_sensors_menu("Sensors");
+
+extern unsigned long screen_brightness;
+DummyAction screen_brightness_menu_item_1("1");
+DummyAction screen_brightness_menu_item_10("10");
+DummyAction screen_brightness_menu_item_25("25");
+DummyAction screen_brightness_menu_item_50("50");
+DummyAction screen_brightness_menu_item_75("75");
+DummyAction screen_brightness_menu_item_100("100");
+std::vector<DummyAction*> screen_brightness_menu_items = {
+    &screen_brightness_menu_item_1,
+    &screen_brightness_menu_item_10,
+    &screen_brightness_menu_item_25,
+    &screen_brightness_menu_item_50,
+    &screen_brightness_menu_item_75,
+    &screen_brightness_menu_item_100,
+};
+std::vector<int> screen_brightness_menu_item_map = {1, 8, 26, 64, 128, 255};
+RadioMenu screen_brightness_menu(
+    screen_brightness_menu_items,
+    (int&)screen_brightness,
+    screen_brightness_menu_item_map,
+    4
+);
+OpenScreenAction open_screen_brightness_menu("Brightness", &screen_brightness_menu);
+
+extern unsigned long screen_timeout;
+DummyAction screen_timeout_menu_item_30s("30s");
+DummyAction screen_timeout_menu_item_3m("3m");
+DummyAction screen_timeout_menu_item_5m("5m");
+DummyAction screen_timeout_menu_item_10m("10m");
+std::vector<DummyAction*> screen_timeout_menu_items = {
+    &screen_timeout_menu_item_30s,
+    &screen_timeout_menu_item_3m,
+    &screen_timeout_menu_item_5m,
+    &screen_timeout_menu_item_10m,
+};
+std::vector<int> screen_timeout_menu_item_map = {
+    30000,
+    60 * 3 * 60000,
+    60 * 5 * 60000,
+    60 * 10 * 60000,
+};
+RadioMenu screen_timeout_menu(
+    screen_timeout_menu_items,
+    (int&)screen_timeout,
+    screen_timeout_menu_item_map,
+    1
+);
+OpenScreenAction open_screen_timeout_menu("Screen Timeout", &screen_timeout_menu);
+
+void invert_screen_color() {
+    static bool screen_inverted = false;
+    if(!screen_inverted)
+        u8g2.sendF("c", 0xA7);
+    else
+        u8g2.sendF("c", 0xA6);
+
+    screen_inverted = !screen_inverted;
+}
+FunctionAction screen_invert("Invert Color", invert_screen_color);
+
+std::vector<Action*> screen_menu_items = {
+    &open_screen_brightness_menu,
+    &open_screen_timeout_menu,
+    &screen_invert,
+};
+Menu screen_menu(screen_menu_items, 0);
+OpenScreenAction open_screen_menu("Screen", &screen_menu);
 
 InfoScreen info_screen_instance;
 OpenScreenAction open_info_menu("Info", &info_screen_instance);
 
-void reboot_func() {
-    esp_restart();
-}
-FunctionAction reboot("Reboot", reboot_func);
+FunctionAction reboot("Reboot", esp_restart);
 
-// system menu
 std::vector<Action*> settings_menu_items = {
     &open_connectivity_menu,
+    &open_sensors_menu,
     &open_screen_menu,
     &open_info_menu,
     &reboot,
 };
-Menu settings_menu(settings_menu_items);
+Menu settings_menu(settings_menu_items, 0);
 OpenScreenAction open_settings_menu("Settings", &settings_menu);
 
-// sensor menu
 std::vector<Action*> sensor_data_menu_items;
-Menu sensor_data_menu(sensor_data_menu_items);
+Menu sensor_data_menu(sensor_data_menu_items, 0);
 OpenScreenAction open_sensor_data_menu("Sensor Data", &sensor_data_menu);
 
-// main menu
 std::vector<Action*> main_menu_items = {
     &open_sensor_data_menu,
     &open_settings_menu,
     &broadcast,
 };
-Menu main_menu(main_menu_items);
+Menu main_menu(main_menu_items, 0);
 
 void ui_init() {
     sensor_data_menu_items.reserve(SENS_COUNT);

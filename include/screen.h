@@ -80,7 +80,7 @@ protected:
     int item_sel_next = 1;
 
 public:
-    Menu(std::vector<Action*> &items);
+    Menu(std::vector<Action*> &items, unsigned default_select);
     void process_navigation(
         unsigned long button_select_press_duration,
         bool button_up_clicked,
@@ -93,10 +93,15 @@ class RadioMenu: public Menu {
 private:
     int radio_state = 0;
     int &bound_target;
-    std::vector<int> value_map;
+    std::vector<int> &value_map;
 
 public:
-    RadioMenu(std::vector<DummyAction*> &items, int &bound_target, std::vector<int> value_map);
+    RadioMenu(
+        std::vector<DummyAction*> &items,
+        int &bound_target,
+        std::vector<int> &value_map,
+        unsigned default_state
+    );
     void process_navigation(
         unsigned long button_select_press_duration,
         bool button_up_clicked,
