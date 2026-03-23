@@ -16,8 +16,6 @@ bool BH1750_US::getEvent(sensors_event_t* event) {
         sensor_hw.start();
     }
 
-    printf("quality: %d, mtreg %d\n", sensor_hw.getQuality(), sensor_hw.getMtreg());
-
     memset(event, 0, sizeof(sensors_event_t));
     event->version = 1;
     event->sensor_id = sensor_id;

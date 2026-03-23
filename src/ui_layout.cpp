@@ -41,10 +41,12 @@ void broadcast_func() {
         switch(broadcast_type) {
             case BLE_BEACON: {
                 ble_beacon_stop();
+                puts("ble beacon stopped");
                 break;
             }
             case BLE_SERVER: {
                 ble_server_stop();
+                puts("ble server started");
                 break;
             }
             default: return; // not gonna happened
@@ -59,10 +61,12 @@ void broadcast_func() {
         switch(broadcast_type) {
             case BLE_BEACON: {
                 ble_beacon_start();
+                puts("ble beacon started");
                 break;
             }
             case BLE_SERVER: {
                 ble_server_start();
+                puts("ble server started");
                 break;
             }
             default: {
@@ -116,9 +120,9 @@ std::vector<DummyAction*> screen_timeout_menu_items = {
 };
 std::vector<int> screen_timeout_menu_item_map = {
     30000,
-    60 * 3 * 60000,
-    60 * 5 * 60000,
-    60 * 10 * 60000,
+    3 * 60000,
+    5 * 60000,
+    10 * 60000,
 };
 RadioMenu screen_timeout_menu(
     screen_timeout_menu_items,

@@ -85,7 +85,7 @@ void turn_on_screen() {
     if(!screen_off || sleep_lock) return;
 
     // if this func get called
-    // that mean beacom mode is not running
+    // that mean beacon mode is not running
 
     setCpuFrequencyMhz(160);
     unset_low_power_sensor_mode();
@@ -134,6 +134,10 @@ void update_battery_readings() {
 }
 
 void setup() {
+    // wait for usb cdc to connect
+    delay(1000);
+    puts("hello from esp32c3");
+
     pinMode(BUTTON_UP_PIN, INPUT);
     pinMode(BUTTON_DOWN_PIN, INPUT);
     pinMode(BUTTON_SELECT_PIN, INPUT);
@@ -145,7 +149,10 @@ void setup() {
 
     Wire.begin(SDA_PIN, SCL_PIN);
 
-    u8g2.begin();
+    if(!u8g2.begin()) {
+        puts("screen is failing, please check connection");
+        while(1);
+    }
 
     if(init_sensors() != (1 << SENS_COUNT) - 1) {
         u8g2.setFont(u8g2_font_4x6_tf);
@@ -191,7 +198,6 @@ void loop() {
     }
 
     if(current_ts - last_sensor_update_ts > 10 && broadcasting) {
-        long unsigned measure_time = current_ts;
         sensors_data_t sensors_data;
         get_sensors_data(sensors_data);
         
@@ -206,9 +212,6 @@ void loop() {
             }
             default:;
         }
-
-        last_sensor_update_ts = current_ts;
-        printf("Measure time: %dms\n", current_ts - measure_time);
     }
 
     static bool button_up_clicked = false;

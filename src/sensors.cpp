@@ -131,6 +131,8 @@ uint16_t init_sensors() {
         sensor_mask |= 1 << SENS_HUMIDITY;
         sensors[SENS_TEMPERATURE] = ahtx0.getTemperatureSensor();
         sensors[SENS_HUMIDITY] = ahtx0.getHumiditySensor();
+    } else {
+        puts("AHT20 failed");
     }
 
     if(bmp280.begin(0x77)) {
@@ -144,6 +146,8 @@ uint16_t init_sensors() {
             bmp280_filter,
             bmp280_standby_duration
         );
+    } else {
+        puts("BMP280 failed");
     }
 
     if(bh1750_hw.begin(0x23)) {
@@ -151,6 +155,8 @@ uint16_t init_sensors() {
         sensors[SENS_LIGHT] = &bh1750;
         bh1750_hw.calibrateTiming();
         bh1750_hw.start(BH1750_QUALITY_HIGH2, 69);
+    } else {
+        puts("BH1750 failed");
     }
 
     if(BMI160.begin(BMI160GenClass::I2C_MODE, 0x69)) {
@@ -164,6 +170,8 @@ uint16_t init_sensors() {
         BMI160.setFullScaleGyroRange(bmi160_gyro_range);
         BMI160.setGyroRange(bmi160_gyro_range);
         BMI160.setGyroRate(bmi160_gyro_odr);
+    } else {
+        puts("BMI160 failed");
     }
 
     return sensor_mask;
