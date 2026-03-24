@@ -7,7 +7,7 @@
 
 extern uint8_t battery_percentage;
 extern uint16_t psu_voltage_avg;
-extern bool broadcasting;
+extern bool is_session_running;
 
 void InfoScreen::process_navigation(
     unsigned long button_select_press_duration,
@@ -35,66 +35,15 @@ void InfoScreen::draw(U8G2 &u8g2) {
 
     int y = current_y;
 
-    u8g2.setCursor(0, y);
-    u8g2.print("Chip: ");
-    esp_chip_info_t chip_info;
-    esp_chip_info(&chip_info);
-    switch(chip_info.model) {
-        case CHIP_ESP32:
-            u8g2.print("ESP32");
-            break;
-        case CHIP_ESP32S2:
-            u8g2.print("ESP32-S2");
-            break;
-        case CHIP_ESP32S3:
-            u8g2.print("ESP32-S3");
-            break;
-        case CHIP_ESP32C3:
-            u8g2.print("ESP32-C3");
-            break;
-        case CHIP_ESP32H2:
-            u8g2.print("ESP32-H2");
-            break;
-        default:
-            u8g2.printf("OTHER (%d)", chip_info.model);
-            break;
-    }
-
-    u8g2.printf(" rev%d %dcore", chip_info.revision, chip_info.cores); y += 8;
-    u8g2.setCursor(0, y); u8g2.printf("Features:"); y += 8;
-
-    uint32_t feature_mask = chip_info.features;
-    if(feature_mask & 1) {
-        u8g2.setCursor(5, y); u8g2.printf("Embedded flash"); y += 8;
-    }
-    feature_mask >>= 1;
-    if(feature_mask & 1) {
-        u8g2.setCursor(5, y); u8g2.printf("2.4GHz WiFi"); y += 8;
-    }
-    feature_mask >>= 3;
-    if(feature_mask & 1) {
-        u8g2.setCursor(5, y); u8g2.printf("Bluetooth LE"); y += 8;
-    }
-    feature_mask >>= 1;
-    if(feature_mask & 1) {
-        u8g2.setCursor(5, y); u8g2.printf("Bluetooth classic"); y += 8;
-    }
-    feature_mask >>= 1;
-    if(feature_mask & 1) {
-        u8g2.setCursor(5, y); u8g2.printf("IEEE 802.15.4"); y += 8;
-    }
-    feature_mask >>= 1;
-    if(feature_mask & 1) {
-        u8g2.setCursor(5, y); u8g2.printf("Embedded PSRAM"); y += 8;
-    }
-
-    uint32_t flash_size = 0;
-    esp_flash_get_size(NULL, &flash_size);
-    u8g2.setCursor(0, y); 
-    u8g2.printf("Flash size: %lu MiB", flash_size / (1024 * 1024)); 
+    u8g2.setCursor(0, y); u8g2.printf("Battery: %dmV | %d%%", psu_voltage_avg, battery_percentage);
     y += 8;
 
-    u8g2.setCursor(0, y); u8g2.printf("Battery: %dmV | %d%%", psu_voltage_avg, battery_percentage);
+    u8g2.setCursor(0, y);
+    if(is_session_running) {
+        u8g2.print("Session started");
+    } else {
+        u8g2.print("Session stopped");
+    }
     y += 8;
 
     uint32_t free_heap = esp_get_free_heap_size() / 1024;
@@ -158,6 +107,65 @@ void InfoScreen::draw(U8G2 &u8g2) {
         default:
             u8g2.print("OTHER");
     }
+    y += 8;
+
+    u8g2.setCursor(0, y);
+    u8g2.print("Chip: ");
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+    switch(chip_info.model) {
+        case CHIP_ESP32:
+            u8g2.print("ESP32");
+            break;
+        case CHIP_ESP32S2:
+            u8g2.print("ESP32-S2");
+            break;
+        case CHIP_ESP32S3:
+            u8g2.print("ESP32-S3");
+            break;
+        case CHIP_ESP32C3:
+            u8g2.print("ESP32-C3");
+            break;
+        case CHIP_ESP32H2:
+            u8g2.print("ESP32-H2");
+            break;
+        default:
+            u8g2.printf("OTHER (%d)", chip_info.model);
+            break;
+    }
+
+    u8g2.printf(" rev%d %dcore", chip_info.revision, chip_info.cores); y += 8;
+    u8g2.setCursor(0, y); u8g2.printf("Features:"); y += 8;
+
+    uint32_t feature_mask = chip_info.features;
+    if(feature_mask & 1) {
+        u8g2.setCursor(5, y); u8g2.printf("Embedded flash"); y += 8;
+    }
+    feature_mask >>= 1;
+    if(feature_mask & 1) {
+        u8g2.setCursor(5, y); u8g2.printf("2.4GHz WiFi"); y += 8;
+    }
+    feature_mask >>= 3;
+    if(feature_mask & 1) {
+        u8g2.setCursor(5, y); u8g2.printf("Bluetooth LE"); y += 8;
+    }
+    feature_mask >>= 1;
+    if(feature_mask & 1) {
+        u8g2.setCursor(5, y); u8g2.printf("Bluetooth classic"); y += 8;
+    }
+    feature_mask >>= 1;
+    if(feature_mask & 1) {
+        u8g2.setCursor(5, y); u8g2.printf("IEEE 802.15.4"); y += 8;
+    }
+    feature_mask >>= 1;
+    if(feature_mask & 1) {
+        u8g2.setCursor(5, y); u8g2.printf("Embedded PSRAM"); y += 8;
+    }
+
+    uint32_t flash_size = 0;
+    esp_flash_get_size(NULL, &flash_size);
+    u8g2.setCursor(0, y); 
+    u8g2.printf("Flash size: %lu MiB", flash_size / (1024 * 1024)); 
     y += 8;
 
     u8g2.setCursor(0, y);

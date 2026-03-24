@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <sensors.h>
 
-enum BroadcastType {
+enum TelemetryType {
     BLE_SERVER,
     BLE_BEACON,
     WIFI,

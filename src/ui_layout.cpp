@@ -1,5 +1,6 @@
 #include <ui_layout.h>
 #include <Preferences.h>
+#include <preference_keys.h>
 #include <U8g2lib.h>
 #include <screen.h>
 #include <action.h>
@@ -7,11 +8,11 @@
 #include <sensors.h>
 #include <Adafruit_Sensor.h>
 
-extern bool broadcasting;
+extern bool is_session_running;
 extern U8G2 u8g2;
 extern Preferences preferences;
+extern TelemetryType telemetry_type;
 
-extern BroadcastType new_broadcast_type;
 DummyAction ble_server_option("BLE Server");
 DummyAction ble_beacon_option("BLE Beacon");
 DummyAction wifi_option("WiFi");
@@ -26,64 +27,125 @@ std::vector<int> connectivity_menu_item_map = {
     WIFI,
 };
 void connectivity_callback(int nval) {
-    preferences.putUChar("broadcast-type", nval);
-    printf("set bt %d\n", nval);
+    preferences.putUChar(KEY_TELEMETRY_TYPE, nval);
 }
 RadioMenu connectivity_menu(
     connectivity_menu_items,
-    (int&)new_broadcast_type,
+    (int&)telemetry_type,
     connectivity_menu_item_map,
-    connectivity_callback
+    connectivity_callback,
+    nullptr
 );
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
-void broadcast_func() {
-    extern FunctionAction broadcast;
-    extern BroadcastType broadcast_type;
+void toggle_session_func() {
+    extern FunctionAction toggle_session;
+    extern bool is_telemetry_enabled;
+    extern bool is_datalogger_enabled;
 
-    if(broadcasting) {
-        switch(broadcast_type) {
-            case BLE_BEACON: {
-                ble_beacon_stop();
-                puts("ble beacon stopped");
-                break;
-            }
-            case BLE_SERVER: {
-                ble_server_stop();
-                puts("ble server started");
-                break;
-            }
-            default: return; // not gonna happened
-        };
-
-        broadcast.set_name("Broadcast");
-        open_notification("Stopped\nbroadcasting");
-        broadcasting = false;
-        broadcast_type = new_broadcast_type;
-    } else {
-        broadcast_type = new_broadcast_type;
-        switch(broadcast_type) {
-            case BLE_BEACON: {
-                ble_beacon_start();
-                puts("ble beacon started");
-                break;
-            }
-            case BLE_SERVER: {
-                ble_server_start();
-                puts("ble server started");
-                break;
-            }
-            default: {
-                open_notification("Unsupported\nconnectivity");
-                return;
+    if(is_session_running) {
+        if(is_telemetry_enabled) {
+            switch(telemetry_type) {
+                case BLE_BEACON: {
+                    ble_beacon_stop();
+                    puts("ble beacon stopped");
+                    break;
+                }
+                case BLE_SERVER: {
+                    ble_server_stop();
+                    puts("ble server started");
+                    break;
+                }
+                default: return; // not gonna happened
             }
         }
-        broadcast.set_name("Broadcasting");
-        open_notification("Started\nbroadcasting");
-        broadcasting = true;
+
+        if(is_datalogger_enabled) {
+        }
+
+        toggle_session.set_name("Start Session");
+        open_notification("Session stopped");
+        is_session_running = false;
+    } else {
+        if(is_telemetry_enabled) {
+            switch(telemetry_type) {
+                case BLE_BEACON: {
+                    ble_beacon_start();
+                    puts("ble beacon started");
+                    break;
+                }
+                case BLE_SERVER: {
+                    ble_server_start();
+                    puts("ble server started");
+                    break;
+                }
+                default: {
+                    open_notification("Unsupported\telemetry type");
+                    return;
+                }
+            }
+        }
+
+        if(is_datalogger_enabled) {
+        }
+
+        if(is_telemetry_enabled || is_datalogger_enabled) {
+            toggle_session.set_name("Stop Session");
+            open_notification("Session started");
+            is_session_running = true;
+        } else {
+            open_notification("No job to do\nPlease turn on\neither telemetry\nor datalogger");
+        }
     }
 }
-FunctionAction broadcast("Broadcast", broadcast_func);
+FunctionAction toggle_session("Start Session", toggle_session_func);
+
+extern bool is_telemetry_enabled;
+DummyAction broadcasting_menu_item_disable("Disable");
+DummyAction broadcasting_menu_item_enable("Enable");
+std::vector<DummyAction*> broadcasting_state_menu_items = {
+    &broadcasting_menu_item_disable,
+    &broadcasting_menu_item_enable,
+};
+std::vector<int> broadcasting_enable_menu_item_map = {0, 1};
+void broadcasting_callback(int nval) {
+    preferences.getBool(KEY_BROADCAST_ENABLE, nval);
+}
+RadioMenu broadcasting_menu(
+    broadcasting_state_menu_items,
+    (int&)is_telemetry_enabled,
+    broadcasting_enable_menu_item_map,
+    broadcasting_callback,
+    &is_session_running
+);
+OpenScreenAction open_broadcasting_menu("Broadcasting", &broadcasting_menu);
+
+std::vector<Action*> telemetry_menu_items = {
+    &open_connectivity_menu,
+    &open_broadcasting_menu
+};
+Menu telemetry_menu(telemetry_menu_items, &is_session_running);
+OpenScreenAction open_telemetry_menu("Telemetry", &telemetry_menu);
+
+extern bool is_datalogger_enabled;
+DummyAction datalogger_menu_item_disable("Disable");
+DummyAction datalogger_menu_item_enable("Enable");
+std::vector<DummyAction*> datalogger_menu_items = {
+    &datalogger_menu_item_disable,
+    &datalogger_menu_item_enable,
+};
+std::vector<int> datalogger_menu_item_map = {0, 1};
+void datalogger_callback(int nval) {
+    preferences.getBool(KEY_DATALOGGER_ENABLE, nval);
+}
+RadioMenu datalogger_menu(
+    datalogger_menu_items,
+    (int&)is_datalogger_enabled,
+    datalogger_menu_item_map,
+    datalogger_callback,
+    &is_session_running
+);
+OpenScreenAction open_datalogger_menu("Datalogger", &datalogger_menu);
 
 DummyAction open_sensors_menu("Sensors");
 
@@ -102,13 +164,14 @@ std::vector<DummyAction*> screen_brightness_menu_items = {
 };
 std::vector<int> screen_brightness_menu_item_map = {8, 26, 64, 128, 255};
 void brightness_callback(int nval) {
-    preferences.putUChar("scrn-bright", nval);
+    preferences.putUChar(KEY_SCREEN_BRIGHTNESS, nval);
 }
 RadioMenu screen_brightness_menu(
     screen_brightness_menu_items,
     (int&)screen_brightness,
     screen_brightness_menu_item_map,
-    brightness_callback
+    brightness_callback,
+    nullptr
 );
 OpenScreenAction open_screen_brightness_menu("Brightness", &screen_brightness_menu);
 
@@ -130,13 +193,14 @@ std::vector<int> screen_timeout_menu_item_map = {
     10 * 60000,
 };
 void screen_timeout_callback(int nval) {
-    preferences.putULong("scrn-timeout", nval);
+    preferences.putULong(KEY_SCREEN_TIMEOUT, nval);
 }
 RadioMenu screen_timeout_menu(
     screen_timeout_menu_items,
     (int&)screen_timeout,
     screen_timeout_menu_item_map,
-    screen_timeout_callback
+    screen_timeout_callback,
+    nullptr
 );
 OpenScreenAction open_screen_timeout_menu("Screen Timeout", &screen_timeout_menu);
 
@@ -156,27 +220,8 @@ std::vector<Action*> screen_menu_items = {
     &open_screen_timeout_menu,
     &screen_invert,
 };
-Menu screen_menu(screen_menu_items);
+Menu screen_menu(screen_menu_items, nullptr);
 OpenScreenAction open_screen_menu("Screen", &screen_menu);
-
-extern bool is_datalogger_enabled;
-DummyAction datalogger_menu_item_disable("Disable");
-DummyAction datalogger_menu_item_enable("Enable");
-std::vector<DummyAction*> datalogger_menu_items = {
-    &datalogger_menu_item_disable,
-    &datalogger_menu_item_enable,
-};
-std::vector<int> datalogger_menu_item_map = {0, 1};
-void datalogger_callback(int nval) {
-    preferences.getBool("datalogger-en", nval);
-}
-RadioMenu datalogger_menu(
-    datalogger_menu_items,
-    (int&)is_datalogger_enabled,
-    datalogger_menu_item_map,
-    datalogger_callback
-);
-OpenScreenAction open_datalogger_menu("Datalogger", &datalogger_menu);
 
 InfoScreen info_screen_instance;
 OpenScreenAction open_info_menu("Info", &info_screen_instance);
@@ -184,30 +229,30 @@ OpenScreenAction open_info_menu("Info", &info_screen_instance);
 FunctionAction reboot("Reboot", esp_restart);
 
 std::vector<Action*> settings_menu_items = {
-    &open_connectivity_menu,
+    &open_telemetry_menu,
+    &open_datalogger_menu,
     &open_sensors_menu,
     &open_screen_menu,
-    &open_datalogger_menu,
     &open_info_menu,
     &reboot,
 };
-Menu settings_menu(settings_menu_items);
+Menu settings_menu(settings_menu_items, nullptr);
 OpenScreenAction open_settings_menu("Settings", &settings_menu);
 
 std::vector<Action*> sensor_data_menu_items;
-Menu sensor_data_menu(sensor_data_menu_items);
+Menu sensor_data_menu(sensor_data_menu_items, nullptr);
 OpenScreenAction open_sensor_data_menu("Sensor Data", &sensor_data_menu);
 
 SplashScreen splash_screen;
 OpenScreenAction open_splash_screen("Splash GIF", &splash_screen);
 
 std::vector<Action*> main_menu_items = {
+    &toggle_session,
     &open_sensor_data_menu,
     &open_settings_menu,
-    &broadcast,
     &open_splash_screen
 };
-Menu main_menu(main_menu_items);
+Menu main_menu(main_menu_items, nullptr);
 
 void ui_init() {
     sensor_data_menu_items.reserve(SENS_COUNT);

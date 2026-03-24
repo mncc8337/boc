@@ -22,6 +22,7 @@ public:
     ) = 0;
     virtual void setup();
     virtual void draw(U8G2 &u8g2) = 0;
+    virtual bool is_blocked();
     virtual bool is_overlay();
     virtual bool prevent_sleep();
     void request_redraw();
@@ -89,15 +90,17 @@ protected:
     int item_selected = 0;
     int item_sel_previous = -1;
     int item_sel_next = 1;
+    bool *block_flag;
 
 public:
-    Menu(std::vector<Action*> &items);
+    Menu(std::vector<Action*> &items, bool *block_flag);
     void process_navigation(
         unsigned long button_select_press_duration,
         bool button_up_clicked,
         bool button_down_clicked
     ) override;
     void draw(U8G2 &u8g2) override;
+    bool is_blocked() override;
 };
 
 class RadioMenu: public Menu {
@@ -112,7 +115,8 @@ public:
         std::vector<DummyAction*> &items,
         int &bound_target,
         std::vector<int> &value_map,
-        void (*callback)(int new_val)
+        void (*callback)(int new_val),
+        bool *block_flag
     );
     void process_navigation(
         unsigned long button_select_press_duration,

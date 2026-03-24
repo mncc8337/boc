@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <LittleFS.h>
 #include <Preferences.h>
+#include <preference_keys.h>
 
 #include <esp_sleep.h>
 
@@ -36,17 +37,17 @@ Preferences preferences;
 
 uint16_t feature_mask = 0;
 
-bool broadcasting = false;
+bool is_session_running = false;
 
-BroadcastType broadcast_type;
-BroadcastType new_broadcast_type;
+bool is_datalogger_enabled;
+
+bool is_telemetry_enabled;
+TelemetryType telemetry_type;
 
 bool sleep_lock = false;
 bool screen_off = false;
 unsigned long screen_timeout;
-
 uint8_t screen_brightness;
-bool is_datalogger_enabled;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0);
 
@@ -56,6 +57,10 @@ unsigned screen_stack_ptr = 0;
 void open_screen(Screen *screen) {
     if(screen_stack_ptr >= 8 || screen_stack[screen_stack_ptr - 1] == current_screen)
         return;
+    if(screen->is_blocked()) {
+        open_notification("this menu is\nnot available\nright now");
+        return;
+    }
     screen_stack[screen_stack_ptr++] = current_screen;
     current_screen = screen;
     current_screen->setup();
@@ -74,7 +79,7 @@ void turn_off_screen() {
 
     u8g2.setPowerSave(1);
 
-    if(!broadcasting) {
+    if(!is_session_running) {
         sleep_sensors();
         gpio_wakeup_enable((gpio_num_t)BUTTON_SELECT_PIN, GPIO_INTR_HIGH_LEVEL);
         esp_sleep_enable_gpio_wakeup();
@@ -219,11 +224,11 @@ void setup() {
 
     // load saved settings
     preferences.begin("settings", false);
-    screen_timeout = preferences.getULong("scrn-timeout", 3 * 60000);
-    screen_brightness = preferences.getUChar("scrn-bright", 128);
-    is_datalogger_enabled = preferences.getBool("datalogger-en", false);
-    broadcast_type = (BroadcastType)preferences.getUChar("broadcast-type", BLE_SERVER);
-    new_broadcast_type = broadcast_type;
+    screen_timeout = preferences.getULong(KEY_SCREEN_TIMEOUT, 3 * 60000);
+    screen_brightness = preferences.getUChar(KEY_SCREEN_BRIGHTNESS, 128);
+    is_datalogger_enabled = preferences.getBool(KEY_DATALOGGER_ENABLE, false);
+    is_telemetry_enabled = preferences.getBool(KEY_BROADCAST_ENABLE, false);
+    telemetry_type = (TelemetryType)preferences.getUChar(KEY_TELEMETRY_TYPE, BLE_SERVER);
 
     printf("%d\n", screen_brightness);
 
@@ -255,11 +260,11 @@ void loop() {
         last_battery_update_ts = current_ts;
     }
 
-    if(current_ts - last_sensor_update_ts > 10 && broadcasting) {
+    if(current_ts - last_sensor_update_ts > 10 && is_session_running) {
         sensors_data_t sensors_data;
         get_sensors_data(sensors_data);
         
-        switch(broadcast_type) {
+        switch(telemetry_type) {
             case BLE_BEACON: {
                 ble_beacon_set_data(sensors_data);
                 break;

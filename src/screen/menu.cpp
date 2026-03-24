@@ -2,8 +2,9 @@
 #include <action.h>
 #include <bitmap.h>
 
-Menu::Menu(std::vector<Action*> &items)
-    : items((std::vector<Action*>&)items) {}
+Menu::Menu(std::vector<Action*> &items, bool *block_flag)
+    : items((std::vector<Action*>&)items),
+      block_flag(block_flag) {}
 
 void Menu::process_navigation(
     unsigned long button_select_press_duration,
@@ -70,4 +71,11 @@ void Menu::draw(U8G2 &u8g2) {
     );
 
     redraw_request = false;
+}
+
+bool Menu::is_blocked() {
+    if(block_flag)
+        return *block_flag;
+
+    return false;
 }

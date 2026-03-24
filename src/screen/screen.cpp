@@ -3,6 +3,10 @@
 
 void Screen::setup() {}
 
+bool Screen::is_blocked() {
+    return false;
+}
+
 bool Screen::is_overlay() {
     return false;
 }

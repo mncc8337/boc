@@ -6,9 +6,10 @@ RadioMenu::RadioMenu(
     std::vector<DummyAction*> &items,
     int &bound_target,
     std::vector<int> &value_map,
-    void (*callback)(int new_value)
+    void (*callback)(int new_value),
+    bool *block_flag
 )
-    : Menu((std::vector<Action*> &)items),
+    : Menu((std::vector<Action*> &)items, block_flag),
       bound_target(bound_target),
       value_map(value_map),
       callback(callback) {
