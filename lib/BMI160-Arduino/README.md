@@ -1,5 +1,5 @@
 # Notice
-This repo was cloned from https://github.com/hanyazou/BMI160-Arduino.git. Changes weren't specified.
+This repo was cloned from https://github.com/hanyazou/BMI160-Arduino.git. See commit history for changes.
 # BMI160-Arduino
 
 This driver is for BMI160 6DoF sensor breakout boards which are connected through the Arduino SPI.
