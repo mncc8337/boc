@@ -4,6 +4,7 @@
 #include <U8g2lib.h>
 #include <string>
 #include <vector>
+#include <Adafruit_Sensor.h>
 
 class Action;
 class DummyAction;
@@ -64,13 +65,15 @@ private:
     float min_sensor_value;
     bool multi_axis;
 
+    sensors_event_t sensor_event;
+
     bool graph_screen = false;
     float graph_data[127];
     unsigned graph_data_pos = 0;
     unsigned axis = 0;
     bool auto_scaling = false;
 
-    unsigned long sample_interval_ms = 50;
+    unsigned long sample_interval_ms = 40;
     unsigned long last_sampling_ts = 0;
 public:
     SensorView(Adafruit_Sensor &sensor);

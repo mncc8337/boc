@@ -42,33 +42,36 @@ void SensorView::process_navigation(
     bool button_up_clicked,
     bool button_down_clicked
 ) {
-    if(graph_screen && (button_up_clicked || button_down_clicked)) {
-            if(button_up_clicked && button_down_clicked) {
-                if(multi_axis) {
-                    axis++;
-                    axis %= 3;
-                }
-            } else if(button_down_clicked) {
-                if(sample_interval_ms > 20)
-                    sample_interval_ms -= 10;
-            } else {
-                sample_interval_ms += 10;
-            }
+    if(graph_screen && multi_axis && button_up_clicked && button_down_clicked) {
+        axis++;
+        axis %= 3;
     }
+    else if(button_down_clicked) {
+        if(sample_interval_ms > 40)
+            sample_interval_ms -= 10;
+    }
+    else if(button_up_clicked) {
+        sample_interval_ms += 10;
+    }
+
 
     if(button_select_press_duration > 50) {
         graph_screen = !graph_screen;
         request_redraw();
     }
+
+    if(millis() - last_sampling_ts >= sample_interval_ms) {
+        sensor.getEvent(&sensor_event);
+        graph_data[graph_data_pos++] = sensor_event.data[axis];
+        graph_data_pos %= 127;
+        last_sampling_ts = millis();
+
+        request_redraw();
+    }
 }
 
 void SensorView::draw(U8G2 &u8g2) {
-    sensors_event_t event;
-
     if(!graph_screen) {
-        sensor.getEvent(&event);
-        float *data = event.data;
-
         int y = 9;
 
         u8g2.setFont(u8g2_font_tenthinnerguys_tf);
@@ -78,14 +81,18 @@ void SensorView::draw(U8G2 &u8g2) {
         u8g2.setFont(u8g2_font_tiny5_tf);
         u8g2.setCursor(0, y);
         u8g2.print(get_sensor_type_string(sensor_type));
+        y += 5 + 2;
+
+        u8g2.setCursor(0, y);
+        u8g2.printf("interval: %dms", sample_interval_ms);
         y += 12 + 2;
 
         u8g2.setFont(u8g2_font_glasstown_nbp_tf);
-        u8g2.setCursor(8, y); u8g2.printf("TS: %d", event.timestamp); y += 12;
+        u8g2.setCursor(8, y); u8g2.printf("TS: %d", sensor_event.timestamp); y += 12;
 
         if(!multi_axis) {
             u8g2.setCursor(8, y);
-            u8g2.printf("Val: %.2f %s", data[0], get_sensor_unit_string(sensor_type));
+            u8g2.printf("Val: %.2f %s", sensor_event.data[0], get_sensor_unit_string(sensor_type));
             y += 12;
         } else {
             u8g2.setCursor(8, y);
@@ -94,19 +101,13 @@ void SensorView::draw(U8G2 &u8g2) {
             u8g2.setCursor(8, y);
             u8g2.printf(
                 "Val: x.%.2f y.%.2f z.%.2f",
-                data[0],
-                data[1],
-                data[2]
+                sensor_event.data[0],
+                sensor_event.data[1],
+                sensor_event.data[2]
             );
             y += 12;
         }
     } else {
-        if(millis() - last_sampling_ts >= sample_interval_ms) {
-            sensor.getEvent(&event);
-            graph_data[graph_data_pos++] = event.data[axis];
-            graph_data_pos %= 127;
-            last_sampling_ts = millis();
-        }
         u8g2.setFont(u8g2_font_u8glib_4_tf);
         const int FONT_HEIGHT = 6;
         if(!multi_axis) {
@@ -209,7 +210,7 @@ void SensorView::draw(U8G2 &u8g2) {
         }
     }
 
-    // redraw_request = false;
+    redraw_request = false;
 }
 
 bool SensorView::prevent_sleep() {
