@@ -70,6 +70,7 @@ static void make_ble_beacon_payload(const sensors_data_t &data, std::vector<uint
 }
 
 void ble_beacon_start() {
+    NimBLEDevice::init("SBOX");
     NimBLEAdvertising *advertising = NimBLEDevice::getAdvertising();
     advertising->reset();
     NimBLEAdvertisementData advertisement_data = NimBLEAdvertisementData();
@@ -113,4 +114,6 @@ void ble_beacon_stop() {
 
     if(advertising->isAdvertising())
         advertising->stop();
+
+    NimBLEDevice::deinit(true);
 }

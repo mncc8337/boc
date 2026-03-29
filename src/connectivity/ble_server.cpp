@@ -27,7 +27,7 @@ NimBLECharacteristic **sensor_characteristic_map[] {
 
 volatile bool device_connected = false;
 
-class MyServerCallbacks: public NimBLEServerCallbacks {
+class ServerCallbacks: public NimBLEServerCallbacks {
     void onConnect(NimBLEServer* pServer, NimBLEConnInfo& connInfo) override {
         device_connected = true;
     };
@@ -39,8 +39,9 @@ class MyServerCallbacks: public NimBLEServerCallbacks {
 };
 
 void ble_server_start() {
+    NimBLEDevice::init("SBOX");
     ble_server = NimBLEDevice::createServer();
-    ble_server->setCallbacks(new MyServerCallbacks());
+    ble_server->setCallbacks(new ServerCallbacks());
 
     NimBLEService* battery_service = ble_server->createService("180F");
     bat_characteristic = battery_service->createCharacteristic(
@@ -49,7 +50,7 @@ void ble_server_start() {
 
     NimBLEService* env_service = ble_server->createService("181A");
 
-    if(SENSOR_ACTIVE(SENS_TEMPERATURE) && SENSOR_ACTIVE(SENS_TEMPERATURE)) {
+    if(SENSOR_ALIVE(SENS_TEMPERATURE) && SENSOR_ACTIVE(SENS_TEMPERATURE)) {
         temp_characteristic = env_service->createCharacteristic(
             "2A6E", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
         );
@@ -158,7 +159,7 @@ void ble_server_update(const sensors_data_t &data, const uint8_t bat_level) {
 }
 
 void ble_server_stop() {
-    if (ble_server != nullptr) {
+    if(ble_server != nullptr) {
         NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
         if (advertising->isAdvertising()) {
             advertising->stop();
@@ -173,4 +174,6 @@ void ble_server_stop() {
 
         device_connected = false;
     }
+
+    NimBLEDevice::deinit(true);
 }

@@ -29,13 +29,6 @@
 
 #define BATTERY_PIN 0
 
-enum Feature {
-    FEAT_BLE      = 0b00000001,
-    FEAT_WIFI     = 0b00000010,
-    FEAT_LITTLEFS = 0b00000100,
-};
-uint8_t feature_mask = 0;
-
 Preferences preferences;
 
 bool is_session_running = false;
@@ -249,25 +242,7 @@ void setup() {
         while(digitalRead(BUTTON_SELECT_PIN) == LOW)
             delay(10);
     } else {
-        feature_mask |= FEAT_LITTLEFS;
         ESP_LOGI("SYSTEM", "LittleFS mounted");
-    }
-
-    if(!ble_init()) {
-        u8g2.clearBuffer();
-        u8g2.setFont(u8g2_font_4x6_tf);
-        u8g2.setCursor(0, 5); u8g2.printf("failed to init BLE");
-        u8g2.setCursor(0, 5 * 2 + 2 * 1); u8g2.printf("BLE features may not be usable");
-        u8g2.setCursor(0, 5 * 3 + 2 * 2); u8g2.printf("press SELECT to continue");
-        u8g2.sendBuffer();
-
-        ESP_LOGE("SYSTEM", "Failed to init BLE");
-
-        while(digitalRead(BUTTON_SELECT_PIN) == LOW)
-            delay(10);
-    } else {
-        feature_mask |= FEAT_BLE;
-        ESP_LOGI("SYSTEM", "BLE initialized");
     }
 
     // load saved settings
@@ -413,5 +388,5 @@ void loop() {
         turn_off_screen();
     }
 
-    delay(10);
+    delay(1);
 }
