@@ -4,12 +4,23 @@
 #include <Arduino.h>
 
 // 'scrollbar_background', 8x64px
-extern const unsigned char BITMAP_SCROLLBAR_BACKGROUND[] PROGMEM;
+extern const uint8_t BITMAP_SCROLLBAR_BACKGROUND[] PROGMEM;
+// 'item_sel_outline', 124x20px
+extern const uint8_t BITMAP_ITEM_SEL_OUTLINE[] PROGMEM;
 
-// 'item_sel_outline', 128x21px
-extern const unsigned char BITMAP_ITEM_SEL_OUTLINE[] PROGMEM;
+// 'radiobutton', 16x16px
+extern const uint8_t BITMAP_RADIOBUTTON [] PROGMEM;
+// 'radiodot', 16x16px
+extern const uint8_t BITMAP_RADIODOT [] PROGMEM;
+// 'check', 16x16px
+extern const uint8_t BITMAP_CHECK[] PROGMEM;
+// 'checkbox', 16x16px
+extern const uint8_t BITMAP_CHECKBOX[] PROGMEM;
 
-extern const int BITMAP_SPLASH_LEN;
-extern const unsigned char *BITMAP_SPLASH[];
+// 'notification-box', 108x44px
+extern const uint8_t BITMAP_NOTIFICATION_BOX[] PROGMEM;
+
+extern const unsigned BITMAP_SPLASH_LEN;
+extern const uint8_t *BITMAP_SPLASH[];
 
 #endif

@@ -1,5 +1,8 @@
+#!/bin/env python3
+
 import asyncio
 import struct
+import time
 from enum import IntEnum
 from bleak import BleakScanner
 
@@ -103,7 +106,7 @@ def detection_callback(device, advertisement_data):
     all_raw = chunk1 + chunk2
         
     if all_raw:
-        print(f"\n[+] CATCHED | MAC: {device.address} | RSSI: {advertisement_data.rssi} dBm")
+        print(f"\n[+] {time.strftime("%H:%M:%S", time.localtime())} | MAC: {device.address} | RSSI: {advertisement_data.rssi} dBm")
         print(f"    RAW: {all_raw.hex().upper()}")
         
         decoded = parse_payload(all_raw)

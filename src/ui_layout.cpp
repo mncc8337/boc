@@ -1,10 +1,10 @@
-#include <ctime>
-#include <string>
+#include "esp32-hal-log.h"
 #include <ui_layout.h>
 #include <screen.h>
 #include <action.h>
 
 #include <U8g2lib.h>
+#include <bitmap.h>
 
 #include <sensors.h>
 #include <Adafruit_Sensor.h>
@@ -14,6 +14,7 @@
 #include <Preferences.h>
 #include <preference_keys.h>
 #include <esp_sleep.h>
+#include <esp_log.h>
 
 #include <WiFi.h>
 
@@ -21,6 +22,72 @@ extern bool is_session_running;
 extern U8G2 u8g2;
 extern Preferences preferences;
 extern TelemetryType telemetry_type;
+
+void toggle_session_func() {
+    extern FunctionAction toggle_session;
+    extern bool is_telemetry_enabled;
+    extern bool is_datalogger_enabled;
+
+    if(is_session_running) {
+        if(is_telemetry_enabled) {
+            switch(telemetry_type) {
+                case BLE_BEACON: {
+                    ble_beacon_stop();
+                    ESP_LOGI("TELEMETRY", "BLE beacon stopped");
+                    break;
+                }
+                case BLE_SERVER: {
+                    ble_server_stop();
+                    ESP_LOGI("TELEMETRY", "BLE server stopped");
+                    break;
+                }
+                default: return; // not gonna happened
+            }
+        }
+
+        if(is_datalogger_enabled) {
+        }
+
+        toggle_session.name = "Start Session";
+        open_notification("Session stopped");
+        ESP_LOGI("SESSION", "Session stopped");
+        is_session_running = false;
+    } else {
+        if(is_telemetry_enabled) {
+            switch(telemetry_type) {
+                case BLE_BEACON: {
+                    ble_beacon_start();
+                    puts("ble beacon started");
+                    ESP_LOGI("TELEMETRY", "BLE beacon started");
+                    break;
+                }
+                case BLE_SERVER: {
+                    ble_server_start();
+                    puts("ble server started");
+                    ESP_LOGI("TELEMETRY", "BLE server started");
+                    break;
+                }
+                default: {
+                    open_notification("Unsupported\telemetry type");
+                    return;
+                }
+            }
+        }
+
+        if(is_datalogger_enabled) {
+        }
+
+        if(is_telemetry_enabled || is_datalogger_enabled) {
+            toggle_session.name = "Stop Session";
+            open_notification("Session started");
+            ESP_LOGI("SESSION", "Session started");
+            is_session_running = true;
+        } else {
+            open_notification("No job to do\nPlease turn on\neither telemetry\nor datalogger");
+        }
+    }
+}
+FunctionAction toggle_session("Start Session", toggle_session_func);
 
 DummyAction ble_server_option("BLE Server");
 DummyAction ble_beacon_option("BLE Beacon");
@@ -37,6 +104,7 @@ std::vector<int> connectivity_menu_item_map = {
 };
 void connectivity_callback(int nval) {
     preferences.putUChar(KEY_TELEMETRY_TYPE, nval);
+    ESP_LOGI("TELEMETRY", "Set connectivity to %d", nval);
 }
 RadioMenu connectivity_menu(
     connectivity_menu_items,
@@ -46,91 +114,28 @@ RadioMenu connectivity_menu(
 );
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
-void toggle_session_func() {
-    extern FunctionAction toggle_session;
-    extern bool is_telemetry_enabled;
-    extern bool is_datalogger_enabled;
-
-    if(is_session_running) {
-        if(is_telemetry_enabled) {
-            switch(telemetry_type) {
-                case BLE_BEACON: {
-                    ble_beacon_stop();
-                    puts("ble beacon stopped");
-                    break;
-                }
-                case BLE_SERVER: {
-                    ble_server_stop();
-                    puts("ble server started");
-                    break;
-                }
-                default: return; // not gonna happened
-            }
-        }
-
-        if(is_datalogger_enabled) {
-        }
-
-        toggle_session.set_name("Start Session");
-        open_notification("Session stopped");
-        is_session_running = false;
-    } else {
-        if(is_telemetry_enabled) {
-            switch(telemetry_type) {
-                case BLE_BEACON: {
-                    ble_beacon_start();
-                    puts("ble beacon started");
-                    break;
-                }
-                case BLE_SERVER: {
-                    ble_server_start();
-                    puts("ble server started");
-                    break;
-                }
-                default: {
-                    open_notification("Unsupported\telemetry type");
-                    return;
-                }
-            }
-        }
-
-        if(is_datalogger_enabled) {
-        }
-
-        if(is_telemetry_enabled || is_datalogger_enabled) {
-            toggle_session.set_name("Stop Session");
-            open_notification("Session started");
-            is_session_running = true;
-        } else {
-            open_notification("No job to do\nPlease turn on\neither telemetry\nor datalogger");
-        }
-    }
-}
-FunctionAction toggle_session("Start Session", toggle_session_func);
-
 extern bool is_telemetry_enabled;
-DummyAction broadcasting_menu_item_disable("Disable");
-DummyAction broadcasting_menu_item_enable("Enable");
-std::vector<DummyAction*> broadcasting_state_menu_items = {
-    &broadcasting_menu_item_disable,
-    &broadcasting_menu_item_enable,
-};
-std::vector<int> broadcasting_enable_menu_item_map = {0, 1};
-void broadcasting_callback(int nval) {
-    preferences.getBool(KEY_BROADCAST_ENABLE, nval);
+void do_toggle_telemetry() {
+    extern FunctionAction toggle_telemetry;
+
+    is_telemetry_enabled = !is_telemetry_enabled;
+    if(is_telemetry_enabled) {
+        toggle_telemetry.name = "Disable";
+        open_notification("Telemetry\nenabled");
+        ESP_LOGI("TELEMETRY", "Telemetry enabled");
+    } else {
+        toggle_telemetry.name = "Enable";
+        open_notification("Telemetry\ndisabled");
+        ESP_LOGI("TELEMETRY", "Telemetry disabled");
+    }
+
+    preferences.putBool(KEY_TELEMETRY_ENABLE, is_telemetry_enabled);
 }
-RadioMenu broadcasting_menu(
-    broadcasting_state_menu_items,
-    (int&)is_telemetry_enabled,
-    broadcasting_enable_menu_item_map,
-    broadcasting_callback,
-    &is_session_running
-);
-OpenScreenAction open_broadcasting_menu("Broadcasting", &broadcasting_menu);
+FunctionAction toggle_telemetry("Enable", do_toggle_telemetry);
 
 std::vector<Action*> telemetry_menu_items = {
     &open_connectivity_menu,
-    &open_broadcasting_menu
+    &toggle_telemetry
 };
 Menu telemetry_menu(telemetry_menu_items, &is_session_running);
 OpenScreenAction open_telemetry_menu("Telemetry", &telemetry_menu);
@@ -145,6 +150,7 @@ std::vector<DummyAction*> datalogger_menu_items = {
 std::vector<int> datalogger_menu_item_map = {0, 1};
 void datalogger_callback(int nval) {
     preferences.getBool(KEY_DATALOGGER_ENABLE, nval);
+    ESP_LOGI("DATALOGGER", "State set to %d", nval);
 }
 RadioMenu datalogger_menu(
     datalogger_menu_items,
@@ -155,7 +161,29 @@ RadioMenu datalogger_menu(
 );
 OpenScreenAction open_datalogger_menu("Datalogger", &datalogger_menu);
 
-DummyAction open_sensors_menu("Sensors");
+DummyAction open_sensor_config_menu("Config");
+
+extern CheckBoxMask log_n_send_mask;
+std::vector<DummyAction*> log_n_send_menu_items = {};
+std::vector<unsigned> log_n_send_menu_bit_map = {};
+void log_n_send_callback(CheckBoxMask nmask) {
+    ESP_LOGD("SENSORS", "New log & send mask: 0x%X", nmask);
+}
+CheckBoxMenu log_n_send_menu(
+    log_n_send_menu_items,
+    log_n_send_mask,
+    log_n_send_menu_bit_map,
+    log_n_send_callback,
+    &is_session_running
+);
+OpenScreenAction open_log_n_send_menu("Log & Send", &log_n_send_menu);
+
+std::vector<Action*> sensors_menu_items = {
+    &open_sensor_config_menu,
+    &open_log_n_send_menu,
+};
+Menu sensors_menu(sensors_menu_items, &is_session_running);
+OpenScreenAction open_sensors_menu("Sensors", &sensors_menu);
 
 extern unsigned long screen_brightness;
 DummyAction screen_brightness_menu_item_10("10");
@@ -173,6 +201,7 @@ std::vector<DummyAction*> screen_brightness_menu_items = {
 std::vector<int> screen_brightness_menu_item_map = {8, 26, 64, 128, 255};
 void brightness_callback(int nval) {
     preferences.putUChar(KEY_SCREEN_BRIGHTNESS, nval);
+    ESP_LOGI("SCREEN", "Brightness set to %d", nval);
 }
 RadioMenu screen_brightness_menu(
     screen_brightness_menu_items,
@@ -201,6 +230,7 @@ std::vector<int> screen_timeout_menu_item_map = {
 };
 void screen_timeout_callback(int nval) {
     preferences.putULong(KEY_SCREEN_TIMEOUT, nval);
+    ESP_LOGI("SCREEN", "Timeout set to %d", nval);
 }
 RadioMenu screen_timeout_menu(
     screen_timeout_menu_items,
@@ -218,6 +248,7 @@ void invert_screen_color() {
         u8g2.sendF("c", 0xA6);
 
     screen_inverted = !screen_inverted;
+    ESP_LOGI("SCREEN", "Color inverted");
 }
 FunctionAction screen_invert("Invert Color", invert_screen_color);
 
@@ -243,22 +274,23 @@ void do_sync_time() {
         tries++;
     }
     if(WiFi.status() != WL_CONNECTED) {
-        open_notification("Failed to connect to WiFi");
+        open_notification("Failed to\nconnect to\nWiFi");
+        ESP_LOGE("Time", "Failed to connect to WiFi \"" WIFI_SSID "\"");
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
+        return;
     }
-    open_notification("Connected to WiFi\n\"" WIFI_SSID "\"");
+    open_notification("Syncing ...");
 
     configTzTime(TZ_INFO, NTP_SERVER);
 
     struct tm timeinfo;
     getLocalTime(&timeinfo);
 
-    char buff[32];
-    strftime(buff, 32, "%F\n %T", &timeinfo);
-    open_notification(std::string("Time synced\nCurrent:\n ") + std::string(buff));
+    open_notification("Time synced");
+    ESP_LOGI("TIME", "Time synced");
 
-    WiFi.disconnect(true);  
+    WiFi.disconnect(true); 
     WiFi.mode(WIFI_OFF);
 }
 FunctionAction sync_time("Sync Time", do_sync_time);
@@ -269,7 +301,7 @@ OpenScreenAction open_info_menu("Info", &info_screen_instance);
 FunctionAction reboot("Reboot", esp_restart);
 
 extern void shutdown();
-FunctionAction toggle_deepsleep("Deepsleep", shutdown);
+FunctionAction toggle_shutdown("Shutdown", shutdown);
 
 std::vector<Action*> settings_menu_items = {
     &open_telemetry_menu,
@@ -279,28 +311,28 @@ std::vector<Action*> settings_menu_items = {
     &sync_time,
     &open_info_menu,
     &reboot,
-    &toggle_deepsleep,
+    &toggle_shutdown,
 };
 Menu settings_menu(settings_menu_items);
 OpenScreenAction open_settings_menu("Settings", &settings_menu);
 
-std::vector<Action*> sensor_data_menu_items;
-Menu sensor_data_menu(sensor_data_menu_items);
-OpenScreenAction open_sensor_data_menu("Sensor Data", &sensor_data_menu);
+std::vector<Action*> live_data_menu_items;
+Menu live_data_menu(live_data_menu_items);
+OpenScreenAction open_live_data_menu("Live Data", &live_data_menu);
 
 SplashScreen splash_screen;
 OpenScreenAction open_splash_screen("Splash GIF", &splash_screen);
 
 std::vector<Action*> main_menu_items = {
     &toggle_session,
-    &open_sensor_data_menu,
+    &open_live_data_menu,
     &open_settings_menu,
     &open_splash_screen
 };
 Menu main_menu(main_menu_items);
 
 void ui_init() {
-    sensor_data_menu_items.reserve(SENS_COUNT);
+    live_data_menu_items.reserve(SENS_COUNT);
 
     extern sensors_data_t sensors_data;
     for(unsigned i = 0; i < SENS_COUNT; i++) {
@@ -315,6 +347,16 @@ void ui_init() {
             sensor_view
         );
 
-        sensor_data_menu_items.push_back(open_sensor_view);
+        live_data_menu_items.push_back(open_sensor_view);
+
+        log_n_send_menu_items.push_back(new DummyAction(sensor_info.name));
+        log_n_send_menu_bit_map.push_back(i);
     }
+
+    // setup all screens that have setup() method
+    connectivity_menu.setup();
+    datalogger_menu.setup();
+    screen_brightness_menu.setup();
+    screen_timeout_menu.setup();
+    log_n_send_menu.setup();
 }

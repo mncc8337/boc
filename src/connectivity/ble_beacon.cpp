@@ -12,7 +12,7 @@ static void make_ble_beacon_payload(const sensors_data_t &data, std::vector<uint
     payload.push_back(0xFF);
 
     for(unsigned i = 0; i < SENS_COUNT; i++) {
-        if(!SENSOR_ALIVE(i)) continue;
+        if(!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i)) continue;
 
         switch(i) {
             case SENS_LIGHT: {

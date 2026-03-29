@@ -1,10 +1,10 @@
-#include "BMI160Gen.h"
 #include <sensors.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
 #include <hp_BH1750.h>
 #include <BH1750_US.h>
 #include <BMI160_US.h>
+#include <esp_log.h>
 
 Adafruit_BMP280 bmp280;
 Adafruit_AHTX0 ahtx0;
@@ -15,6 +15,7 @@ BMI160_US_Gyroscope bmi160_gyro(160);
 
 Adafruit_Sensor *sensors[SENS_COUNT];
 uint16_t sensor_mask;
+uint16_t log_n_send_mask = 0xffff;
 
 Adafruit_BMP280::sensor_sampling bmp280_sampling = Adafruit_BMP280::SAMPLING_X16;
 Adafruit_BMP280::sensor_filter bmp280_filter = Adafruit_BMP280::FILTER_X4;
@@ -131,8 +132,9 @@ uint16_t init_sensors() {
         sensor_mask |= 1 << SENS_HUMIDITY;
         sensors[SENS_TEMPERATURE] = ahtx0.getTemperatureSensor();
         sensors[SENS_HUMIDITY] = ahtx0.getHumiditySensor();
+        ESP_LOGI("SENSORS", "AHT20 initialized");
     } else {
-        puts("AHT20 failed");
+        ESP_LOGE("SENSORS", "AHT20 failed to initialize");
     }
 
     if(bmp280.begin(0x77)) {
@@ -146,8 +148,9 @@ uint16_t init_sensors() {
             bmp280_filter,
             bmp280_standby_duration
         );
+        ESP_LOGI("SENSORS", "BMP280 initialized");
     } else {
-        puts("BMP280 failed");
+        ESP_LOGE("SENSORS", "BMP280 failed to initialize");
     }
 
     if(bh1750_hw.begin(0x23)) {
@@ -155,8 +158,9 @@ uint16_t init_sensors() {
         sensors[SENS_LIGHT] = &bh1750;
         bh1750_hw.calibrateTiming();
         bh1750_hw.start(BH1750_QUALITY_HIGH2, 69);
+        ESP_LOGI("SENSORS", "BH1750 initialized");
     } else {
-        puts("BH1750 failed");
+        ESP_LOGE("SENSORS", "BH1750 failed to initialize");
     }
 
     if(BMI160.begin(BMI160GenClass::I2C_MODE, 0x69)) {
@@ -170,8 +174,9 @@ uint16_t init_sensors() {
         BMI160.setFullScaleGyroRange(bmi160_gyro_range);
         BMI160.setGyroRange(bmi160_gyro_range);
         BMI160.setGyroRate(bmi160_gyro_odr);
+        ESP_LOGI("SENSORS", "BMI160 initialized");
     } else {
-        puts("BMI160 failed");
+        ESP_LOGE("SENSORS", "BMI160 failed to initialize");
     }
 
     return sensor_mask;
@@ -185,6 +190,8 @@ void sleep_sensors() {
     
     if(SENSOR_ALIVE(SENS_ACCELERATION))
         bmi160_off();
+
+    ESP_LOGI("SENSORS", "Set all sensors to sleep mode");
 }
 
 void wake_sensors() {
@@ -193,23 +200,29 @@ void wake_sensors() {
 
     if(SENSOR_ALIVE(SENS_ACCELERATION))
         bmi160_on();
+
+    ESP_LOGI("SENSORS", "All sensors waken");
 }
 
 void set_low_power_sensor_mode() {
     if(SENSOR_ALIVE(SENS_ACCELERATION))
         bmi160_off();
+
+    ESP_LOGI("SENSORS", "Set all sensors to low power mode");
 }
 
 void unset_low_power_sensor_mode() {
     if(SENSOR_ALIVE(SENS_ACCELERATION))
         bmi160_on();
+
+    ESP_LOGI("SENSORS", "Unset all sensors to low power mode");
 }
 
 void get_sensors_data(sensors_data_t &data) {
     sensors_event_t event;
 
     for(unsigned i = 0; i < SENS_COUNT; i++) {
-        if(!SENSOR_ALIVE(i)) continue;
+        if(!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i)) continue;
 
         sensors[i]->getEvent(&event);
 
@@ -238,4 +251,6 @@ void get_sensors_data(sensors_data_t &data) {
                 break;
         }
     }
+
+    ESP_LOGD("SENSORS", "All active sensors read");
 }

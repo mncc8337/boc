@@ -48,26 +48,44 @@ void ble_server_start() {
     );
 
     NimBLEService* env_service = ble_server->createService("181A");
-    temp_characteristic = env_service->createCharacteristic(
-        "2A6E", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-    );
-    hum_characteristic = env_service->createCharacteristic(
-        "2A6F", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-    );
-    press_characteristic = env_service->createCharacteristic(
-        "2A6D", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-    );
-    light_characteristic = env_service->createCharacteristic(
-        "2AFB", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-    );
+
+    if(SENSOR_ACTIVE(SENS_TEMPERATURE) && SENSOR_ACTIVE(SENS_TEMPERATURE)) {
+        temp_characteristic = env_service->createCharacteristic(
+            "2A6E", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+    }
+
+    if(SENSOR_ALIVE(SENS_HUMIDITY) && SENSOR_ACTIVE(SENS_HUMIDITY)) {
+        hum_characteristic = env_service->createCharacteristic(
+            "2A6F", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+    }
+
+    if(SENSOR_ALIVE(SENS_PRESSURE) && SENSOR_ACTIVE(SENS_PRESSURE)) {
+        press_characteristic = env_service->createCharacteristic(
+            "2A6D", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+    }
+
+    if(SENSOR_ALIVE(SENS_LIGHT) && SENSOR_ACTIVE(SENS_LIGHT)) {
+        light_characteristic = env_service->createCharacteristic(
+            "2AFB", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+    }
 
     NimBLEService* measurement_service = ble_server->createService("185A");
-    accel_characteristic = measurement_service->createCharacteristic(
-        "2C06", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-    );
-    gyro_characteristic = measurement_service->createCharacteristic(
-        "2C09", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-    );
+
+    if(SENSOR_ALIVE(SENS_ACCELERATION) && SENSOR_ACTIVE(SENS_ACCELERATION)) {
+        accel_characteristic = measurement_service->createCharacteristic(
+            "2C06", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+    }
+
+    if(SENSOR_ALIVE(SENS_GYROSCOPE) && SENSOR_ACTIVE(SENS_GYROSCOPE)) {
+        gyro_characteristic = measurement_service->createCharacteristic(
+            "2C09", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        );
+    }
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->reset();
@@ -87,7 +105,7 @@ void ble_server_update(const sensors_data_t &data, const uint8_t bat_level) {
     std::vector<uint8_t> data_to_send;
 
     for(unsigned i = 0; i < SENS_COUNT; i++) {
-        if (!SENSOR_ALIVE(i)) continue; 
+        if (!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i)) continue; 
         
         data_to_send.clear();
 

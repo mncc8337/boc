@@ -10,6 +10,8 @@ class Action;
 class DummyAction;
 class Adafruit_Sensor;
 
+typedef uint16_t CheckBoxMask;
+
 extern void open_notification(std::string message);
 
 class Screen {
@@ -119,6 +121,29 @@ public:
         int &bound_target,
         std::vector<int> &value_map,
         void (*callback)(int new_val),
+        bool *block_flag=nullptr
+    );
+    void process_navigation(
+        unsigned long button_select_press_duration,
+        bool button_up_clicked,
+        bool button_down_clicked
+    ) override;
+    void setup() override;
+    void draw(U8G2 &u8g2) override;
+};
+
+class CheckBoxMenu: public Menu {
+private:
+    CheckBoxMask &item_mask;
+    std::vector<unsigned> &bit_map;
+    void (*callback)(CheckBoxMask new_val);
+
+public:
+    CheckBoxMenu(
+        std::vector<DummyAction*> &items,
+        CheckBoxMask &item_mask,
+        std::vector<unsigned> &bit_map,
+        void (*callback)(CheckBoxMask new_val),
         bool *block_flag=nullptr
     );
     void process_navigation(

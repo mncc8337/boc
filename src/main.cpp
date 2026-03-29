@@ -5,6 +5,7 @@
 #include <preference_keys.h>
 
 #include <esp_sleep.h>
+#include <esp_log.h>
 
 #include <bitmap.h>
 #include <sensors.h>
@@ -29,13 +30,13 @@
 #define BATTERY_PIN 0
 
 enum Feature {
-    FEAT_BLE = 0b1,
-    FEAT_LITTLEFS = 0b01,
+    FEAT_BLE      = 0b00000001,
+    FEAT_WIFI     = 0b00000010,
+    FEAT_LITTLEFS = 0b00000100,
 };
+uint8_t feature_mask = 0;
 
 Preferences preferences;
-
-uint16_t feature_mask = 0;
 
 bool is_session_running = false;
 
@@ -67,12 +68,11 @@ void open_screen(Screen *screen, bool forced=false) {
     if(screen_stack_ptr >= 8 || screen_stack[screen_stack_ptr - 1] == current_screen)
         return;
     if(screen->is_blocked()) {
-        open_notification("this menu is\nnot available\nright now");
+        open_notification("This menu is\nnot available\nright now");
         return;
     }
     screen_stack[screen_stack_ptr++] = current_screen;
     current_screen = screen;
-    current_screen->setup();
     current_screen->request_redraw();
 
     sleep_lock = current_screen->prevent_sleep();
@@ -80,11 +80,32 @@ void open_screen(Screen *screen, bool forced=false) {
     if(forced) {
         draw_frame();
     }
+
+    ESP_LOGD("UI", "Screen 0x%X opened", current_screen);
 }
 void open_prev_screen() {
     if(!screen_stack_ptr) return;
     current_screen = screen_stack[--screen_stack_ptr];
     current_screen->request_redraw();
+    ESP_LOGD("UI", "Screen 0x%X opened", current_screen);
+}
+
+void shutdown() {
+    ESP_LOGI("SYSTEM", "Shutting down");
+
+    sleep_sensors();
+    u8g2.setPowerSave(1);
+    Wire.end();
+    pinMode(SDA_PIN, INPUT);
+    pinMode(SCL_PIN, INPUT);
+
+    // TODO:
+    // do some hardware tricks to actually cut the power off all peripherals
+
+    // config deep sleep wake pin
+    pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP);
+    esp_deep_sleep_enable_gpio_wakeup(1ULL << BUTTON_SELECT_PIN, ESP_GPIO_WAKEUP_GPIO_HIGH);
+    esp_deep_sleep_start();
 }
 
 void turn_off_screen() {
@@ -104,6 +125,7 @@ void turn_off_screen() {
         pinMode(SDA_PIN, INPUT);
         pinMode(SCL_PIN, INPUT);
 
+        ESP_LOGI("SYSTEM", "Starting light sleep");
         esp_light_sleep_start();
 
         Wire.begin(SDA_PIN, SCL_PIN);
@@ -111,13 +133,16 @@ void turn_off_screen() {
         // the esp wakes up right there
         // also wait for button release
         while(digitalRead(BUTTON_SELECT_PIN) != LOW) delay(10);
+        ESP_LOGI("SYSTEM", "Waken up from light sleep");
 
         wake_sensors();
         u8g2.setPowerSave(0);
+
         return; // no need to set flag
     } else {
         set_low_power_sensor_mode();
         setCpuFrequencyMhz(80);
+        ESP_LOGI("SYSTEM", "Entered low power mode");
     }
 
     screen_off = true;
@@ -133,23 +158,9 @@ void turn_on_screen() {
     unset_low_power_sensor_mode();
     u8g2.setPowerSave(0);
 
+    ESP_LOGI("SYSTEM", "Screen turned on");
+
     screen_off = false;
-}
-
-void shutdown() {
-    sleep_sensors();
-    u8g2.setPowerSave(1);
-    Wire.end();
-    pinMode(SDA_PIN, INPUT);
-    pinMode(SCL_PIN, INPUT);
-
-    // TODO:
-    // do some hardware tricks to actually cut the power off all peripherals
-
-    // config deep sleep wake pin
-    pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP);
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << BUTTON_SELECT_PIN, ESP_GPIO_WAKEUP_GPIO_HIGH);
-    esp_deep_sleep_start();
 }
 
 const unsigned VOLTAGE_HISTORY_SIZE = 16;
@@ -167,6 +178,8 @@ void update_battery_readings() {
     history_ptr %= VOLTAGE_HISTORY_SIZE;
 
     psu_voltage_avg = psu_voltage_sum / VOLTAGE_HISTORY_SIZE;
+
+    ESP_LOGD("BATTERY", "New battery reading: avg %dmV, raw %dmV", psu_voltage_avg, raw);
 
     if(psu_voltage_avg >= 4150) {
         battery_percentage = 100;
@@ -204,8 +217,8 @@ void setup() {
     Wire.beginTransmission(0x3c);
     if(Wire.endTransmission() != 0) {
         delay(1000);
-        puts("screen is failing, please check connection");
-        while(1) delay(1);
+        ESP_LOGE("SYSTEM", "screen is failing, please check connection");
+        while(1) delay(1000);
     }
 
     u8g2.begin();
@@ -218,6 +231,8 @@ void setup() {
         u8g2.setCursor(0, 5 * 3 + 2 * 2); u8g2.printf("press SELECT to continue");
         u8g2.sendBuffer();
 
+        ESP_LOGE("SYSTEM", "Failed to initialize some sensor, mask : 0x%X", sensor_mask);
+
         while(digitalRead(BUTTON_SELECT_PIN) == LOW)
             delay(10);
     }
@@ -229,10 +244,13 @@ void setup() {
         u8g2.setCursor(0, 5 * 2 + 2 * 1); u8g2.printf("press SELECT to continue");
         u8g2.sendBuffer();
 
+        ESP_LOGE("SYSTEM", "Failed to mount LittleFS");
+
         while(digitalRead(BUTTON_SELECT_PIN) == LOW)
             delay(10);
     } else {
         feature_mask |= FEAT_LITTLEFS;
+        ESP_LOGI("SYSTEM", "LittleFS mounted");
     }
 
     if(!ble_init()) {
@@ -243,10 +261,13 @@ void setup() {
         u8g2.setCursor(0, 5 * 3 + 2 * 2); u8g2.printf("press SELECT to continue");
         u8g2.sendBuffer();
 
+        ESP_LOGE("SYSTEM", "Failed to init BLE");
+
         while(digitalRead(BUTTON_SELECT_PIN) == LOW)
             delay(10);
     } else {
         feature_mask |= FEAT_BLE;
+        ESP_LOGI("SYSTEM", "BLE initialized");
     }
 
     // load saved settings
@@ -254,10 +275,12 @@ void setup() {
     screen_timeout = preferences.getULong(KEY_SCREEN_TIMEOUT, 3 * 60000);
     screen_brightness = preferences.getUChar(KEY_SCREEN_BRIGHTNESS, 128);
     is_datalogger_enabled = preferences.getBool(KEY_DATALOGGER_ENABLE, false);
-    is_telemetry_enabled = preferences.getBool(KEY_BROADCAST_ENABLE, false);
+    is_telemetry_enabled = preferences.getBool(KEY_TELEMETRY_ENABLE, false);
     telemetry_type = (TelemetryType)preferences.getUChar(KEY_TELEMETRY_TYPE, BLE_SERVER);
+    ESP_LOGI("SYSTEM", "Loaded saved settings");
 
     ui_init();
+    ESP_LOGI("SYSTEM", "UI initialized");
 
     // load splash gif for fun
     u8g2.setBitmapMode(0);
@@ -268,6 +291,8 @@ void setup() {
         delay(10);
     }
     u8g2.setBitmapMode(1);
+
+    while(digitalRead(BUTTON_SELECT_PIN) == HIGH) delay(10);
 
     current_screen = (Screen*)&main_menu;
     current_screen->request_redraw();
@@ -281,8 +306,10 @@ void loop() {
 
     if(current_ts - last_battery_update_ts > 3000) {
         update_battery_readings();
-        if(psu_voltage_avg < 3400)
+        if(psu_voltage_avg < 3400) {
+            ESP_LOGW("SYSTEM", "Shutting down due to low battery voltage");
             shutdown();
+        }
         last_battery_update_ts = current_ts;
     }
 
@@ -301,6 +328,8 @@ void loop() {
             }
             default:;
         }
+
+        ESP_LOGI("TELEMETRY", "New telemetry packet sent");
     }
 
     static bool button_up_clicked = false;
@@ -329,7 +358,8 @@ void loop() {
 
         // global event
         if(button_select_press_time >= 5000) {
-            turn_off_screen();
+            ESP_LOGW("SYSTEM", "Shutting down due to button presses");
+            shutdown();
         } else if(button_select_press_time >= 300) {
             open_prev_screen();
         } else {
@@ -378,9 +408,10 @@ void loop() {
         idle_ts = current_ts;
         turn_on_screen();
     } else if(current_ts - idle_ts > screen_timeout) {
+        ESP_LOGW("SYSTEM", "Turning off due to no activity");
         idle_ts = current_ts; // prevent sleeping again after waking up
         turn_off_screen();
     }
 
-    delay(1);
+    delay(10);
 }

@@ -52,7 +52,7 @@ void InfoScreen::draw(U8G2 &u8g2) {
     y += 8;
 
     struct tm timeinfo;
-    getLocalTime(&timeinfo);
+    getLocalTime(&timeinfo, 0);
     char buff[32];
     strftime(buff, 32, "%a %F %T", &timeinfo);
     u8g2.setCursor(0, y); u8g2.printf("Current time:");

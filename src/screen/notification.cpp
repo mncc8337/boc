@@ -7,12 +7,13 @@ extern void open_prev_screen();
 extern void open_screen(Screen *screen, bool forced);
 
 // global notification object
-static Notification notif("12345678901234567890"); // reserve 20 bytes
+static Notification notif("1234567890123456789012345678901234567890");
 
 Notification::Notification(std::string message) : message(message) {};
 
 void Notification::set_message(std::string new_message) {
     message = new_message;
+    request_redraw();
 }
 
 void Notification::process_navigation(
@@ -26,9 +27,10 @@ void Notification::process_navigation(
 }
 
 void Notification::draw(U8G2 &u8g2) {
-    u8g2.drawRBox(10, 10, 128 - 20, 64 - 20, 2);
+    u8g2.drawXBM(10, 10, 108, 44, BITMAP_NOTIFICATION_BOX);
+
     u8g2.setDrawColor(0);
-    u8g2.drawRBox(12, 12, 128 - 24, 64 - 24, 2);
+    u8g2.drawBox(11, 11, 108 - 3, 44 - 3);
     u8g2.setDrawColor(1);
 
     u8g2.setFont(u8g2_font_6x10_tf);

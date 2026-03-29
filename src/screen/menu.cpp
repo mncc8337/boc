@@ -38,25 +38,28 @@ void Menu::process_navigation(
 
 void Menu::draw(U8G2 &u8g2) {
     // selected item background
-    u8g2.drawXBMP(0, 22, 128, 21, BITMAP_ITEM_SEL_OUTLINE);
+    u8g2.drawXBMP(0, 22, 124, 20, BITMAP_ITEM_SEL_OUTLINE);
 
     if(item_sel_previous >= 0) {
         // draw previous item as icon + label
         u8g2.setFont(u8g2_font_profont12_tf);
         u8g2.drawStr(25, 15, items[item_sel_previous]->name.c_str());
-        // u8g2.drawXBMP(4, 2 + offset_y, 16, 16, bitmap_icons[item_sel_previous]);
+        if(items[item_sel_previous]->icon)
+            u8g2.drawXBMP(4, 2, 16, 16, items[item_sel_previous]->icon);
     }
 
     // draw selected item as icon + label in bold font
-    u8g2.setFont(u8g2_font_tenthinnerguys_tf); // u8g2_font_DigitalDisco_tu
+    u8g2.setFont(u8g2_font_tenthinnerguys_tf);
     u8g2.drawStr(25, 15+20+2, items[item_selected]->name.c_str());
-    // u8g2.drawXBMP(4, 24 + offset_y, 16, 16, bitmap_icons[item_selected]);
+    if(items[item_selected]->icon)
+        u8g2.drawXBMP(4, 24, 16, 16, items[item_selected]->icon);
 
     if(item_sel_next < items.size()) {
         // draw next item as icon + label
         u8g2.setFont(u8g2_font_profont12_tf);
         u8g2.drawStr(25, 15+20+20+2+2, items[item_sel_next]->name.c_str());
-        // u8g2.drawXBMP(4, 46 + offset_y, 16, 16, bitmap_icons[item_sel_next]);
+        if(items[item_sel_next]->icon)
+            u8g2.drawXBMP(4, 46, 16, 16, items[item_sel_next]->icon);
     }
 
     // draw scrollbar background

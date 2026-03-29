@@ -2,6 +2,7 @@
 #define SENSORS_H
 
 #define SENSOR_ALIVE(id) ((sensor_mask >> id) & 1)
+#define SENSOR_ACTIVE(id) ((log_n_send_mask >> id) & 1)
 
 #include <stdint.h>
 
@@ -28,6 +29,7 @@ typedef struct {
 
 extern Adafruit_Sensor *sensors[SENS_COUNT];
 extern uint16_t sensor_mask;
+extern uint16_t log_n_send_mask;
 
 extern const char* get_sensor_type_string(const int &type);
 extern const char* get_sensor_unit_string(const int type);

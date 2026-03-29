@@ -3,23 +3,22 @@
 
 extern void open_screen(Screen*, bool forced=false);
 
-Action::Action(std::string name) : name(name) {};
+Action::Action(std::string name, const uint8_t *icon)
+    : name(name), icon(icon) {};
 
-void Action::set_name(std::string new_name) {
-    name = new_name;
-}
-
-DummyAction::DummyAction(std::string name) : Action(name) {};
+DummyAction::DummyAction(std::string name, const uint8_t *icon) : Action(name, icon) {};
 
 void DummyAction::execute() {};
 
-FunctionAction::FunctionAction(std::string name, void (*action_ptr)(void)) : Action(name), action_ptr(action_ptr) {}
+FunctionAction::FunctionAction(std::string name, void (*action_ptr)(void), const uint8_t *icon)
+    : Action(name, icon), action_ptr(action_ptr) {}
 
 void FunctionAction::execute() {
     action_ptr();
 }
 
-OpenScreenAction::OpenScreenAction(std::string name, Screen *screen) : Action(name), screen(screen) {}
+OpenScreenAction::OpenScreenAction(std::string name, Screen *screen, const uint8_t *icon)
+    : Action(name, icon), screen(screen) {}
 
 void OpenScreenAction::execute() {
     open_screen(screen);
