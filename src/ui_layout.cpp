@@ -14,7 +14,6 @@
 #include <preference_keys.h>
 #include <esp_sleep.h>
 #include <esp_log.h>
-#include <mutexes.h>
 
 #include <WiFi.h>
 
@@ -333,8 +332,9 @@ std::vector<Action*> main_menu_items = {
 Menu main_menu(main_menu_items);
 
 void ui_init() {
-    live_data_menu_items.reserve(SENS_COUNT);
+    toggle_telemetry.name = is_telemetry_enabled ? "Disable" : "Enable";
 
+    live_data_menu_items.reserve(SENS_COUNT);
     for(unsigned i = 0; i < SENS_COUNT; i++) {
         if(!SENSOR_ALIVE(i)) continue;
 

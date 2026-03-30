@@ -47,11 +47,14 @@ void SensorView::process_navigation(
         axis %= 3;
     }
     else if(button_down_clicked) {
-        if(sample_interval_ms > 40)
+        if(sample_interval_ms > 10) {
             sample_interval_ms -= 10;
+            set_live_data_sampling_interval(sample_interval_ms);
+        }
     }
     else if(button_up_clicked) {
         sample_interval_ms += 10;
+        set_live_data_sampling_interval(sample_interval_ms);
     }
 
 
@@ -60,18 +63,7 @@ void SensorView::process_navigation(
         request_redraw();
     }
 
-    unsigned long sampling_delay = millis() - last_sampling_ts;
-    if(sampling_delay >= sample_interval_ms) {
-        request_live_data_sensor_poll(sensor_id);
-
-        if(sampling_delay > sample_interval_ms * 2) {
-            last_sampling_ts += sampling_delay;
-        } else {
-            last_sampling_ts += sample_interval_ms;
-        }
-    }
-
-    if(requested_live_data_poll_ready(sensor_event)) {
+    if(live_data_ready(sensor_event)) {
         graph_data[graph_data_pos++] = sensor_event.data[axis];
         graph_data_pos %= 127;
         request_redraw();
@@ -227,6 +219,14 @@ void SensorView::draw(U8G2 &u8g2) {
     }
 
     redraw_request = false;
+}
+
+void SensorView::open_callback() {
+    subscribe_live_data(sensor_id, sample_interval_ms);
+}
+
+void SensorView::close_callback() {
+    unsubscribe_live_data();
 }
 
 bool SensorView::prevent_sleep() {

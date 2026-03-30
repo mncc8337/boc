@@ -42,10 +42,13 @@ extern void wake_sensors();
 extern void set_low_power_sensor_mode();
 extern void unset_low_power_sensor_mode();
 
-extern void request_live_data_sensor_poll(int target_sensor);
-extern bool requested_live_data_poll_ready(sensors_event_t &out_event);
+extern void subscribe_live_data(int target_sensor, unsigned long sampling_interval);
+extern void unsubscribe_live_data();
+extern void set_live_data_sampling_interval(unsigned long sampling_interval);
+extern bool live_data_ready(sensors_event_t &out_event);
 extern bool all_data_poll_ready(sensors_data_t &out_data);
 
+extern TaskHandle_t sensors_task_handle;
 extern void sensors_task(void *parameters);
 
 #endif

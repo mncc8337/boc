@@ -1,5 +1,4 @@
 #include "Arduino.h"
-#include "freertos/projdefs.h"
 #include <sensors.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
@@ -9,10 +8,8 @@
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <mutexes.h>
 
 #include <esp_log.h>
-#include <sys/unistd.h>
 
 Adafruit_BMP280 bmp280;
 Adafruit_AHTX0 ahtx0;
@@ -35,7 +32,7 @@ int bmi160_accel_odr = BMI160_ACCEL_RATE_100HZ;
 int bmi160_gyro_range = BMI160_GYRO_RANGE_2000;
 int bmi160_gyro_odr = BMI160_GYRO_RATE_50HZ;
 
-QueueHandle_t live_data_sensor_event_queue;
+QueueHandle_t live_data_event_queue;
 volatile int live_data_sensor_id = -1;
 
 QueueHandle_t all_lognsend_sensor_data_queue;
@@ -134,6 +131,8 @@ static void bmi160_off() {
     BMI160.setRegister(0x7E, 0x14); delay(50);
 }
 
+TaskHandle_t sensors_task_handle = nullptr;
+
 uint16_t sensors_init() {
     sensor_mask = 0;
     for(int i = 0; i < SENS_COUNT; i++) {
@@ -193,7 +192,7 @@ uint16_t sensors_init() {
     }
 
     // setup rtos task stuff
-    live_data_sensor_event_queue = xQueueCreate(1, sizeof(sensors_event_t));
+    live_data_event_queue = xQueueCreate(1, sizeof(sensors_event_t));
     all_lognsend_sensor_data_queue =  xQueueCreate(1, sizeof(sensors_data_t));
 
     return sensor_mask;
@@ -235,21 +234,33 @@ void unset_low_power_sensor_mode() {
     ESP_LOGI("SENSORS", "Unset all sensors to low power mode");
 }
 
-void request_live_data_sensor_poll(int target_sensor) {
+static unsigned long live_data_sampling_interval = 0;
+void subscribe_live_data(int target_sensor, unsigned long sampling_interval) {
+    xQueueReset(live_data_event_queue);
     live_data_sensor_id = target_sensor;
-    xQueueReset(live_data_sensor_event_queue);
+    live_data_sampling_interval = sampling_interval;
+
+    if(sensors_task_handle != NULL) xTaskNotifyGive(sensors_task_handle); 
 }
 
-bool requested_live_data_poll_ready(sensors_event_t &out_event) {
-    if(xQueueReceive(live_data_sensor_event_queue, &out_event, 0) == pdPASS) {
-        live_data_sensor_id = -1;
+void unsubscribe_live_data() {
+    live_data_sensor_id = -1;
+}
+
+void set_live_data_sampling_interval(unsigned long sampling_interval) {
+    live_data_sampling_interval = sampling_interval;
+    if(sensors_task_handle != NULL) xTaskNotifyGive(sensors_task_handle); 
+}
+
+bool live_data_ready(sensors_event_t &out_event) {
+    if(xQueueReceive(live_data_event_queue, &out_event, 2) == pdPASS) {
         return true;
     }
     return false;
 }
 
 bool all_data_poll_ready(sensors_data_t &out_data) {
-    if(xQueueReceive(all_lognsend_sensor_data_queue, &out_data, 0) == pdPASS) {
+    if(xQueueReceive(all_lognsend_sensor_data_queue, &out_data, 2) == pdPASS) {
         return true;
     }
     return false;
@@ -278,7 +289,7 @@ void sensors_task(void *parameters) {
 
                 // poll live data sensor
                 if(i == live_data_local_id)
-                    xQueueOverwrite(live_data_sensor_event_queue, &t_event);
+                    xQueueOverwrite(live_data_event_queue, &t_event);
 
                 switch(i) {
                     case SENS_TEMPERATURE:
@@ -311,7 +322,7 @@ void sensors_task(void *parameters) {
                 ready_mask = 0;
                 all_data = {0};
                 // data packet isnt sent that regularly
-                vTaskDelay(pdMS_TO_TICKS(100));
+                ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
                 continue;
             }
             // repoll, some sensors aint ready
@@ -320,20 +331,34 @@ void sensors_task(void *parameters) {
             if(live_data_local_id >= 0 && SENSOR_ALIVE(live_data_local_id)) {
                 sensors_event_t t_event;
                 bool ready = sensors[live_data_local_id]->getEvent(&t_event);
-                t_event.sensor_id = live_data_local_id;
 
                 if(ready) {
-                    xQueueOverwrite(live_data_sensor_event_queue, &t_event);
+                    t_event.sensor_id = live_data_local_id;
+                    xQueueOverwrite(live_data_event_queue, &t_event);
 
-                    // it is guarantee that no sensorview screen has sample interval
-                    // smaller than 40ms
-                    vTaskDelay(pdMS_TO_TICKS(40));
-                    continue;
+                    unsigned long now = millis();
+                    static unsigned long next_target_time = now;
+                    unsigned long local_sampling_interval = live_data_sampling_interval;
+
+                    if(now > next_target_time + local_sampling_interval)
+                        next_target_time = now;
+
+                    next_target_time += local_sampling_interval;
+
+                    if(next_target_time > now) {
+                        unsigned long sleep_time = next_target_time - now;
+                        if(sleep_time > 5) sleep_time -= 5;
+                        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(sleep_time));
+                        continue;
+                    } else {
+                        next_target_time = now;
+                        continue;
+                    }
                 }
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10));
     }
 
     vTaskDelete(NULL);

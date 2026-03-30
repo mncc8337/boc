@@ -16,6 +16,13 @@ CheckBoxMenu::CheckBoxMenu(
       item_mask_buffer(item_mask),
       bit_map(bit_map),
       callback(callback) {
+    item_selected = 0;
+    item_sel_previous = -1;
+    item_sel_next = 1;
+
+    for(unsigned i = 0; i < items.size(); i++) {
+        items[i]->icon = BITMAP_CHECKBOX;
+    }
 }
 
 void CheckBoxMenu::process_navigation(
@@ -52,16 +59,6 @@ void CheckBoxMenu::draw(U8G2 &u8g2) {
                 BITMAP_CHECK
             );
         }
-    }
-}
-
-void CheckBoxMenu::open_callback() {
-    item_selected = 0;
-    item_sel_previous = -1;
-    item_sel_next = 1;
-
-    for(unsigned i = 0; i < items.size(); i++) {
-        items[i]->icon = BITMAP_CHECKBOX;
     }
 }
 

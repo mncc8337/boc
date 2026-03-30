@@ -6,7 +6,6 @@
 
 #include <esp_sleep.h>
 #include <esp_log.h>
-#include <mutexes.h>
 
 #include <bitmap.h>
 #include <sensors.h>
@@ -261,7 +260,7 @@ void setup() {
     ESP_LOGI("SYSTEM", "UI initialized");
 
     // now start all system tasks
-    xTaskCreate(sensors_task, "SensorPollingTask", 4096, NULL, 1, NULL);
+    xTaskCreate(sensors_task, "SensorPollingTask", 4096, NULL, 1, &sensors_task_handle);
 
     // load splash gif for fun
     u8g2.setBitmapMode(0);
@@ -390,11 +389,10 @@ void loop() {
     if(button_down_action || button_up_action || button_select_press_time) {
         idle_ts = current_ts;
         turn_on_screen();
-    } else if(current_ts - idle_ts > screen_timeout) {
+    } else if(current_ts - idle_ts > screen_timeout && !sleep_lock) {
         ESP_LOGW("SYSTEM", "Turning off due to no activity");
         idle_ts = current_ts; // prevent sleeping again after waking up
         turn_off_screen();
     }
-
     delay(1);
 }
