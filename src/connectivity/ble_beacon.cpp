@@ -70,12 +70,12 @@ static void make_ble_beacon_payload(const sensors_data_t &data, std::vector<uint
 }
 
 void ble_beacon_start() {
-    NimBLEDevice::init("SBOX");
+    NimBLEDevice::init("BOC");
     NimBLEAdvertising *advertising = NimBLEDevice::getAdvertising();
     advertising->reset();
     NimBLEAdvertisementData advertisement_data = NimBLEAdvertisementData();
 
-    advertisement_data.setName("SBOX");
+    advertisement_data.setName("BOC");
     // advertisement_data.setFlags(0x04); 
     // advertisement_data.setAppearance(0x552);
     // advertisement_data.addTxPower();
@@ -96,7 +96,7 @@ void ble_beacon_set_data(const sensors_data_t &data) {
     NimBLEAdvertising *advertising = NimBLEDevice::getAdvertising();
 
     NimBLEAdvertisementData advertisement_data = NimBLEAdvertisementData();
-    advertisement_data.setName("SBOX");
+    advertisement_data.setName("BOC");
     size_t first_chunk_size = std::min((size_t)20, payload.size());
     advertisement_data.setManufacturerData(payload.data(), first_chunk_size);
     advertising->setAdvertisementData(advertisement_data);

@@ -39,7 +39,7 @@ class ServerCallbacks: public NimBLEServerCallbacks {
 };
 
 void ble_server_start() {
-    NimBLEDevice::init("SBOX");
+    NimBLEDevice::init("BOC");
     ble_server = NimBLEDevice::createServer();
     ble_server->setCallbacks(new ServerCallbacks());
 
@@ -90,7 +90,7 @@ void ble_server_start() {
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->reset();
-    advertising->setName("SBOX");
+    advertising->setName("BOC");
     advertising->addServiceUUID("180F");
     advertising->addServiceUUID("181A");
     advertising->addServiceUUID("185A");

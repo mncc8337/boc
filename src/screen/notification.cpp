@@ -7,9 +7,7 @@ extern void open_prev_screen();
 extern void open_screen(Screen *screen, bool forced);
 
 // global notification object
-static Notification notif("1234567890123456789012345678901234567890");
-
-Notification::Notification(std::string message) : message(message) {};
+static Notification notif;
 
 void Notification::set_message(std::string new_message) {
     message = new_message;
@@ -21,7 +19,7 @@ void Notification::process_navigation(
     bool button_up_clicked,
     bool button_down_clicked
 ) {
-    if(button_select_press_duration > 50 || button_down_clicked || button_down_clicked) {
+    if(button_select_press_duration > 50 || button_up_clicked || button_down_clicked) {
         open_prev_screen();
     }
 }
@@ -37,21 +35,19 @@ void Notification::draw(U8G2 &u8g2) {
 
     int current_y = 15 + 7;
     int current_x = 15;
-    char *buff = (char*)message.c_str();
-    char *start_ptr = buff;
-    for(unsigned i = 0; i <= message.size(); i++) {
-        if(buff[i] == '\n') {
-            buff[i] = 0;
-            u8g2.setCursor(current_x, current_y);
-            u8g2.print(start_ptr);
-            current_x = 15;
-            current_y += 7 + 2;
-            start_ptr = buff + i + 1;
-        } else if(buff[i] == 0) {
-            u8g2.setCursor(current_x, current_y);
-            u8g2.print(start_ptr);
-        }
+    int start_pos = 0;
+    size_t end_pos = message.find('\n');
+    while(end_pos != std::string::npos) {
+        u8g2.setCursor(current_x, current_y);
+        u8g2.print(message.substr(start_pos, end_pos - start_pos).c_str());
+        current_x = 15;
+        current_y += 7 + 2;
+        start_pos = end_pos + 1;
+        end_pos = message.find('\n', start_pos);
     }
+    u8g2.setCursor(current_x, current_y);
+    u8g2.print(message.substr(start_pos).c_str());
+
     redraw_request = false;
 }
 

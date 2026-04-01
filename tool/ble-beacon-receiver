@@ -95,7 +95,7 @@ def parse_payload(raw_data):
     return results
 
 def detection_callback(device, advertisement_data):
-    if advertisement_data.local_name != "SBOX":
+    if advertisement_data.local_name != "BOC":
         return
 
     mfg_data = advertisement_data.manufacturer_data

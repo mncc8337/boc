@@ -46,7 +46,6 @@ class Notification: public Screen {
 private:
     std::string message;
 public:
-    Notification(std::string message);
     void process_navigation(
         unsigned long button_select_press_duration,
         bool button_up_clicked,
@@ -156,6 +155,7 @@ public:
         bool button_down_clicked
     ) override;
     void draw(U8G2 &u8g2) override;
+    void open_callback() override;
     void close_callback() override;
 };
 

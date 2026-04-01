@@ -28,9 +28,11 @@ typedef struct {
     float gyro[3];
 } sensors_data_t;
 
+typedef uint16_t sensor_mask_t;
+
 extern Adafruit_Sensor *sensors[SENS_COUNT];
-extern uint16_t sensor_mask;
-extern uint16_t lognsend_mask;
+extern sensor_mask_t sensor_mask;
+extern sensor_mask_t lognsend_mask;
 
 extern const char* get_sensor_type_string(const int &type);
 extern const char* get_sensor_unit_string(const int type);

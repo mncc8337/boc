@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sensor Data Log</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #444; padding: 8px; text-align: center; }
+        th { background: #333; }
+        button { padding: 10px 20px; color: white; border: none; cursor: pointer; background: #007bff; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h2>ESP32 Data Log Viewer</h2>
+    
+    <div>
+        <button onclick="fetchAndParse()">Load Binary Log</button>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Light</th>
+                <th>Temp (&deg;C)</th>
+                <th>Humidity (%)</th>
+                <th>Pressure (hPa)</th>
+                <th>Accel (X,Y,Z)</th>
+                <th>Gyro (X,Y,Z)</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            <tr><td colspan='7'>Click "Load Binary Log" to view data.</td></tr>
+        </tbody>
+    </table>
+
+    <script src="/script.js"></script>
+</body>
+</html>

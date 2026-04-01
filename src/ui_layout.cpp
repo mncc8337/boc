@@ -1,3 +1,4 @@
+#include <sys/_default_fcntl.h>
 #include <ui_layout.h>
 #include <screen.h>
 #include <action.h>
@@ -17,10 +18,14 @@
 
 #include <WiFi.h>
 
+#include <LittleFS.h>
+#include <FS.h>
+
 extern bool is_session_running;
 extern U8G2 u8g2;
 extern Preferences preferences;
 extern TelemetryType telemetry_type;
+extern File logfile;
 
 void toggle_session_func() {
     extern FunctionAction toggle_session;
@@ -44,7 +49,9 @@ void toggle_session_func() {
             }
         }
 
-        if(is_datalogger_enabled) {
+        if(is_datalogger_enabled && logfile) {
+            logfile.close();
+            ESP_LOGI("DATALOGGER", "Logfile closed");
         }
 
         toggle_session.name = "Start Session";
@@ -73,7 +80,9 @@ void toggle_session_func() {
             }
         }
 
-        if(is_datalogger_enabled) {
+        if(is_datalogger_enabled && !logfile) {
+            logfile = LittleFS.open("/data.log", FILE_APPEND);
+            ESP_LOGI("DATALOGGER", "Logfile opened");
         }
 
         if(is_telemetry_enabled || is_datalogger_enabled) {
@@ -148,7 +157,7 @@ std::vector<DummyAction*> datalogger_menu_items = {
 };
 std::vector<int> datalogger_menu_item_map = {0, 1};
 void datalogger_callback(int nval) {
-    preferences.getBool(KEY_DATALOGGER_ENABLE, nval);
+    preferences.putBool(KEY_DATALOGGER_ENABLE, nval);
     ESP_LOGI("DATALOGGER", "State set to %d", nval);
 }
 RadioMenu datalogger_menu(
@@ -162,7 +171,7 @@ OpenScreenAction open_datalogger_menu("Datalogger", &datalogger_menu);
 
 DummyAction open_sensor_config_menu("Config");
 
-extern CheckBoxMask lognsend_mask;
+extern sensor_mask_t lognsend_mask;
 std::vector<DummyAction*> lognsend_menu_items = {};
 std::vector<unsigned> lognsend_menu_bit_map = {};
 void lognsend_callback(CheckBoxMask nmask) {
@@ -298,6 +307,17 @@ FunctionAction sync_time("Sync Time", do_sync_time);
 InfoScreen info_screen_instance;
 OpenScreenAction open_info_menu("Info", &info_screen_instance);
 
+void do_clear_datalog() {
+    if(LittleFS.exists("/data.log")) {
+        File f = LittleFS.open("/data.log", "w");
+        f.close();
+        ESP_LOGI("DATALOGGER", "Log file cleared");
+    } else {
+        open_notification("File does not\nexisted");
+    }
+}
+FunctionAction clear_datalog("Clear datalog", do_clear_datalog);
+
 FunctionAction reboot("Reboot", esp_restart);
 
 extern void shutdown();
@@ -310,6 +330,7 @@ std::vector<Action*> settings_menu_items = {
     &open_screen_menu,
     &sync_time,
     &open_info_menu,
+    &clear_datalog,
     &reboot,
     &toggle_shutdown,
 };
@@ -320,6 +341,26 @@ std::vector<Action*> live_data_menu_items;
 Menu live_data_menu(live_data_menu_items);
 OpenScreenAction open_live_data_menu("Live Data", &live_data_menu);
 
+void do_open_webserver() {
+    extern bool is_webserver_running;
+    extern FunctionAction open_webserver;
+    if(is_webserver_running) {
+        extern void end_webserver();
+        end_webserver();
+        open_notification("Server ended");
+        open_webserver.name = "Start Server";
+    } else {
+        open_notification("Starting server");
+
+        extern void setup_webserver();
+        setup_webserver();
+        IPAddress ip = WiFi.localIP();
+        open_notification(("Server started at\n" + std::string(ip.toString().c_str())));
+        open_webserver.name = "Stop Server";
+    }
+}
+FunctionAction open_webserver("Start Server", do_open_webserver);
+
 SplashScreen splash_screen;
 OpenScreenAction open_splash_screen("Splash GIF", &splash_screen);
 
@@ -327,6 +368,7 @@ std::vector<Action*> main_menu_items = {
     &toggle_session,
     &open_live_data_menu,
     &open_settings_menu,
+    &open_webserver,
     &open_splash_screen
 };
 Menu main_menu(main_menu_items);

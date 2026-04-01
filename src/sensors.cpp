@@ -19,8 +19,8 @@ BMI160_US_Accelerometer bmi160_accel(160);
 BMI160_US_Gyroscope bmi160_gyro(160);
 
 Adafruit_Sensor *sensors[SENS_COUNT];
-uint16_t sensor_mask;
-uint16_t lognsend_mask = 0xffff;
+sensor_mask_t sensor_mask;
+sensor_mask_t lognsend_mask = 0;
 
 Adafruit_BMP280::sensor_sampling bmp280_sampling = Adafruit_BMP280::SAMPLING_X16;
 Adafruit_BMP280::sensor_filter bmp280_filter = Adafruit_BMP280::FILTER_X4;
@@ -195,6 +195,7 @@ uint16_t sensors_init() {
     live_data_event_queue = xQueueCreate(1, sizeof(sensors_event_t));
     all_lognsend_sensor_data_queue =  xQueueCreate(1, sizeof(sensors_data_t));
 
+    lognsend_mask = sensor_mask;
     return sensor_mask;
 }
 
@@ -221,14 +222,14 @@ void wake_sensors() {
 }
 
 void set_low_power_sensor_mode() {
-    if(SENSOR_ALIVE(SENS_ACCELERATION))
+    if(SENSOR_ALIVE(SENS_ACCELERATION) && !SENSOR_ACTIVE(SENS_ACCELERATION))
         bmi160_off();
 
     ESP_LOGI("SENSORS", "Set all sensors to low power mode");
 }
 
 void unset_low_power_sensor_mode() {
-    if(SENSOR_ALIVE(SENS_ACCELERATION))
+    if(SENSOR_ALIVE(SENS_ACCELERATION) && !SENSOR_ACTIVE(SENS_ACCELERATION))
         bmi160_on();
 
     ESP_LOGI("SENSORS", "Unset all sensors to low power mode");
@@ -268,7 +269,7 @@ bool all_data_poll_ready(sensors_data_t &out_data) {
 
 extern bool is_session_running;
 void sensors_task(void *parameters) {
-    uint16_t ready_mask = 0;
+    uint8_t ready_mask = 0;
     sensors_data_t all_data = {0};
 
     while(true) {
@@ -278,6 +279,7 @@ void sensors_task(void *parameters) {
         if(is_session_running) {
             sensors_event_t t_event;
 
+            printf("%X %X %X\n", sensor_mask, lognsend_mask, ready_mask);
             for(unsigned i = 0; i < SENS_COUNT; i++) {
                 if(!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i) || ((ready_mask >> i) & 1)) continue;
 

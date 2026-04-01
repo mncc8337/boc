@@ -1,3 +1,4 @@
+#include "data_logger.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <LittleFS.h>
@@ -37,6 +38,11 @@ volatile bool is_datalogger_enabled;
 
 volatile bool is_telemetry_enabled;
 volatile TelemetryType telemetry_type;
+
+File logfile;
+
+extern bool is_webserver_running;
+extern void loop_webserver();
 
 bool sleep_lock = false;
 bool screen_off = false;
@@ -110,7 +116,7 @@ void turn_off_screen() {
 
     u8g2.setPowerSave(1);
 
-    if(!is_session_running) {
+    if(!is_session_running && !is_webserver_running) {
         sleep_sensors();
         gpio_wakeup_enable((gpio_num_t)BUTTON_SELECT_PIN, GPIO_INTR_HIGH_LEVEL);
         esp_sleep_enable_gpio_wakeup();
@@ -280,7 +286,9 @@ void setup() {
 
 void loop() {
     static long unsigned last_battery_update_ts = 0;
-    static long unsigned last_sensor_update_ts = 0;
+    static long unsigned last_telemetry_packet_ts = 0;
+    static long unsigned last_data_log_ts = 0;
+    // static long unsigned last_flush_ts = 0;
 
     const long unsigned current_ts = millis();
 
@@ -293,10 +301,10 @@ void loop() {
         last_battery_update_ts = current_ts;
     }
 
-    if(current_ts - last_sensor_update_ts > 10 && is_session_running) {
-        last_sensor_update_ts = current_ts;
+    sensors_data_t sensors_data;
+    bool sensors_data_retrieved = false;
 
-        sensors_data_t sensors_data;
+    if(current_ts - last_telemetry_packet_ts > 100 && is_session_running && is_telemetry_enabled) {
         if(all_data_poll_ready(sensors_data)) {
             switch(telemetry_type) {
                 case BLE_BEACON: {
@@ -310,7 +318,23 @@ void loop() {
                 default:;
             }
 
-            ESP_LOGI("TELEMETRY", "New telemetry packet sent");
+            sensors_data_retrieved = true;
+            last_telemetry_packet_ts = current_ts;
+            ESP_LOGD("TELEMETRY", "New telemetry packet sent");
+        }
+    }
+
+    if(current_ts - last_data_log_ts > 5 * 60 * 1000 && is_session_running && is_datalogger_enabled) {
+
+        if(sensors_data_retrieved || all_data_poll_ready(sensors_data)) {
+            write_log_packet(logfile, sensors_data);
+            logfile.flush();
+
+            sensors_data_retrieved = true;
+            last_data_log_ts = current_ts;
+            ESP_LOGI("DATALOGGER", "Data logged");
+
+            // if(current_ts - last_flush_ts > 10 * 60 * 1000)
         }
     }
 
@@ -394,5 +418,9 @@ void loop() {
         idle_ts = current_ts; // prevent sleeping again after waking up
         turn_off_screen();
     }
+
+    if(is_webserver_running)
+        loop_webserver();
+
     delay(1);
 }

@@ -2,9 +2,8 @@
 #define DATA_LOGGER_H
 
 #include <LittleFS.h>
+#include <sensors.h>
 
-extern File logfile;
-
-extern File get_logfile();
+extern void write_log_packet(File &file, sensors_data_t &data);
 
 #endif
