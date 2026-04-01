@@ -35,6 +35,12 @@ void setup_webserver() {
         return;
     }
 
+    // create data.log if not availabled yet
+    if(!LittleFS.exists("/data.log")) {
+        File f = LittleFS.open("/data.log", "w");
+        f.close();
+    }
+
     server.serveStatic("/", LittleFS, "/index.html");
     server.serveStatic("/script.js", LittleFS, "/script.js");
     server.serveStatic("/data.log", LittleFS, "/data.log");
@@ -47,6 +53,8 @@ void setup_webserver() {
 }
 
 void end_webserver() {
+    if(!is_webserver_running) return;
+
     server.close();
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);

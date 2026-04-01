@@ -1,40 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Sensor Data Log</title>
+    <title>BOC Data Log Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #444; padding: 8px; text-align: center; }
-        th { background: #333; }
-        button { padding: 10px 20px; color: white; border: none; cursor: pointer; background: #007bff; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #121212; color: #eee; padding: 20px; }
+        h2 { color: #00d4ff; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .controls { margin-bottom: 20px; display: flex; gap: 15px; align-items: center; }
+        #status { font-size: 0.9em; color: #888; }
+        button { padding: 10px 20px; color: white; border: none; border-radius: 4px; cursor: pointer; background: #007bff; font-weight: bold; }
         button:hover { background: #0056b3; }
+
+        .tabs { display: flex; margin-top: 20px; gap: 5px; border-bottom: 2px solid #333; flex-wrap: wrap; }
+        .tab { padding: 10px 18px; cursor: pointer; background: #1e1e1e; border-radius: 8px 8px 0 0; transition: 0.2s; border: 1px solid #333; border-bottom: none; font-size: 0.9em; }
+        .tab:hover { background: #2a2a2a; }
+        .tab.active { background: #007bff; color: white; border-color: #007bff; }
+        
+        .tab-content { display: none; background: #1e1e1e; padding: 20px; border: 1px solid #333; border-top: none; }
+        .tab-content.active { display: block; }
+
+        .chart-container { position: relative; height: 450px; width: 100%; }
+        .table-container { max-height: 600px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; background: #181818; }
+        th, td { border: 1px solid #333; padding: 12px; text-align: center; font-family: monospace; }
+        th { background: #252525; color: #00d4ff; position: sticky; top: 0; }
+        tr:nth-child(even) { background: #202020; }
     </style>
 </head>
 <body>
-    <h2>ESP32 Data Log Viewer</h2>
+    <h2>BOC Data Log Viewer</h2>
     
-    <div>
+    <div class="controls">
         <button onclick="fetchAndParse()">Load Binary Log</button>
+        <button class="secondary" onclick="resetAllZooms()">Reset Zoom</button>
+        <span id="status">Status: Ready</span>
     </div>
-    
-    <table>
-        <thead>
-            <tr>
-                <th>Time</th>
-                <th>Light</th>
-                <th>Temp (&deg;C)</th>
-                <th>Humidity (%)</th>
-                <th>Pressure (hPa)</th>
-                <th>Accel (X,Y,Z)</th>
-                <th>Gyro (X,Y,Z)</th>
-            </tr>
-        </thead>
-        <tbody id="tableBody">
-            <tr><td colspan='7'>Click "Load Binary Log" to view data.</td></tr>
-        </tbody>
-    </table>
+
+    <div class="tabs">
+        <div class="tab active" onclick="openTab(event, 'tab-temp')">Temperature</div>
+        <div class="tab" onclick="openTab(event, 'tab-hum')">Humidity</div>
+        <div class="tab" onclick="openTab(event, 'tab-press')">Pressure</div>
+        <div class="tab" onclick="openTab(event, 'tab-light')">Light</div>
+        <div class="tab" onclick="openTab(event, 'tab-accel')">Accelerometer</div>
+        <div class="tab" onclick="openTab(event, 'tab-gyro')">Gyroscope</div>
+        <div class="tab" onclick="openTab(event, 'tab-table')">Raw Table</div>
+    </div>
+
+    <div id="tab-temp" class="tab-content active"><div class="chart-container"><canvas id="tempChart"></canvas></div></div>
+    <div id="tab-hum" class="tab-content"><div class="chart-container"><canvas id="humChart"></canvas></div></div>
+    <div id="tab-press" class="tab-content"><div class="chart-container"><canvas id="pressChart"></canvas></div></div>
+    <div id="tab-light" class="tab-content"><div class="chart-container"><canvas id="lightChart"></canvas></div></div>
+    <div id="tab-accel" class="tab-content"><div class="chart-container"><canvas id="accelChart"></canvas></div></div>
+    <div id="tab-gyro" class="tab-content"><div class="chart-container"><canvas id="gyroChart"></canvas></div></div>
+
+    <div id="tab-table" class="tab-content">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Light (Lux)</th>
+                        <th>Temp (&deg;C)</th>
+                        <th>Hum (%)</th>
+                        <th>Press (hPa)</th>
+                        <th>Accel (X,Y,Z) (m/s2)</th>
+                        <th>Gyro (X,Y,Z) (rad/s)</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan='7'>Click "Load Binary Log" to begin.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <script src="/script.js"></script>
+    <script>
+        function openTab(evt, tabId) {
+            const contents = document.getElementsByClassName("tab-content");
+            for(let content of contents) content.style.display = "none";
+
+            const tabs = document.getElementsByClassName("tab");
+            for(let tab of tabs) tab.classList.remove("active");
+
+            const activeContent = document.getElementById(tabId);
+            activeContent.style.display = "block";
+            evt.currentTarget.classList.add("active");
+            
+            window.dispatchEvent(new Event('resize'));
+        }
+    </script>
 </body>
 </html>

@@ -35,11 +35,13 @@ Preferences preferences;
 volatile bool is_session_running = false;
 
 volatile bool is_datalogger_enabled;
+volatile unsigned long datalogger_interval;
 
 volatile bool is_telemetry_enabled;
 volatile TelemetryType telemetry_type;
 
 File logfile;
+bool force_file_flush = false;
 
 extern bool is_webserver_running;
 extern void loop_webserver();
@@ -64,8 +66,10 @@ void draw_frame() {
 }
 
 void open_screen(Screen *screen, bool forced=false) {
-    if(screen_stack_ptr >= 8 || screen_stack[screen_stack_ptr - 1] == current_screen)
+    if(screen_stack_ptr >= 8 || current_screen == screen) {
+        screen->request_redraw();
         return;
+    }
     if(screen->is_blocked()) {
         open_notification("This menu is\nnot available\nright now");
         return;
@@ -258,6 +262,7 @@ void setup() {
     screen_timeout = preferences.getULong(KEY_SCREEN_TIMEOUT, 3 * 60000);
     screen_brightness = preferences.getUChar(KEY_SCREEN_BRIGHTNESS, 128);
     is_datalogger_enabled = preferences.getBool(KEY_DATALOGGER_ENABLE, false);
+    datalogger_interval = preferences.getULong(KEY_DATALOGGER_INTERVAL, 3 * 60 * 1000);
     is_telemetry_enabled = preferences.getBool(KEY_TELEMETRY_ENABLE, false);
     telemetry_type = (TelemetryType)preferences.getUChar(KEY_TELEMETRY_TYPE, BLE_SERVER);
     ESP_LOGI("SYSTEM", "Loaded saved settings");
@@ -288,7 +293,8 @@ void loop() {
     static long unsigned last_battery_update_ts = 0;
     static long unsigned last_telemetry_packet_ts = 0;
     static long unsigned last_data_log_ts = 0;
-    // static long unsigned last_flush_ts = 0;
+    static long unsigned last_flush_ts = 0;
+    static bool unflushed_data = false;
 
     const long unsigned current_ts = millis();
 
@@ -324,18 +330,37 @@ void loop() {
         }
     }
 
-    if(current_ts - last_data_log_ts > 5 * 60 * 1000 && is_session_running && is_datalogger_enabled) {
+    if(
+        current_ts - last_data_log_ts > datalogger_interval
+        && is_session_running
+        && is_datalogger_enabled
+        && (
+            sensors_data_retrieved
+            || all_data_poll_ready(sensors_data)
+        )
+    ) {
+        write_log_packet(logfile, sensors_data);
 
-        if(sensors_data_retrieved || all_data_poll_ready(sensors_data)) {
-            write_log_packet(logfile, sensors_data);
-            logfile.flush();
+        unflushed_data = true;
+        sensors_data_retrieved = true;
+        last_data_log_ts = current_ts;
+        ESP_LOGD("DATALOGGER", "Data read");
+    }
 
-            sensors_data_retrieved = true;
-            last_data_log_ts = current_ts;
-            ESP_LOGI("DATALOGGER", "Data logged");
-
-            // if(current_ts - last_flush_ts > 10 * 60 * 1000)
-        }
+    if(
+        unflushed_data
+        && is_session_running
+        && is_datalogger_enabled
+        && (
+            force_file_flush
+            || datalogger_interval > 5 * 60 * 1000
+            || current_ts - last_flush_ts >= 5 * 60 * 1000
+        )
+    ) {
+        unflushed_data = false;
+        last_flush_ts = current_ts;
+        logfile.flush();
+        ESP_LOGD("DATALOGGER", "Data flushed");
     }
 
     static bool button_up_clicked = false;

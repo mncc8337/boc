@@ -1,4 +1,3 @@
-#include <sys/_default_fcntl.h>
 #include <ui_layout.h>
 #include <screen.h>
 #include <action.h>
@@ -82,6 +81,8 @@ void toggle_session_func() {
 
         if(is_datalogger_enabled && !logfile) {
             logfile = LittleFS.open("/data.log", FILE_APPEND);
+            extern bool force_file_flush;
+            force_file_flush = true;
             ESP_LOGI("DATALOGGER", "Logfile opened");
         }
 
@@ -123,50 +124,110 @@ RadioMenu connectivity_menu(
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
 extern bool is_telemetry_enabled;
-void do_toggle_telemetry() {
-    extern FunctionAction toggle_telemetry;
-
-    is_telemetry_enabled = !is_telemetry_enabled;
-    if(is_telemetry_enabled) {
-        toggle_telemetry.name = "Disable";
-        open_notification("Telemetry\nenabled");
-        ESP_LOGI("TELEMETRY", "Telemetry enabled");
-    } else {
-        toggle_telemetry.name = "Enable";
-        open_notification("Telemetry\ndisabled");
-        ESP_LOGI("TELEMETRY", "Telemetry disabled");
-    }
-
-    preferences.putBool(KEY_TELEMETRY_ENABLE, is_telemetry_enabled);
+DummyAction telemetry_state_menu_item_disable("Disable");
+DummyAction telemetry_state_menu_item_enable("Enable");
+std::vector<DummyAction*> telemetry_state_menu_items = {
+    &telemetry_state_menu_item_disable,
+    &telemetry_state_menu_item_enable,
+};
+std::vector<int> telemetry_state_menu_item_map = {0, 1};
+void telemetry_state_callback(int nval) {
+    preferences.putBool(KEY_TELEMETRY_ENABLE, nval);
+    ESP_LOGI("TELEMETRY", "State set to %d", nval);
 }
-FunctionAction toggle_telemetry("Enable", do_toggle_telemetry);
+RadioMenu telemetry_state_menu(
+    telemetry_state_menu_items,
+    (int&)is_telemetry_enabled,
+    telemetry_state_menu_item_map,
+    telemetry_state_callback,
+    &is_session_running
+);
+OpenScreenAction open_telemetry_state_menu("Broadcasting", &telemetry_state_menu);
 
 std::vector<Action*> telemetry_menu_items = {
     &open_connectivity_menu,
-    &toggle_telemetry
+    &open_telemetry_state_menu
 };
 Menu telemetry_menu(telemetry_menu_items, &is_session_running);
 OpenScreenAction open_telemetry_menu("Telemetry", &telemetry_menu);
 
-extern bool is_datalogger_enabled;
-DummyAction datalogger_menu_item_disable("Disable");
-DummyAction datalogger_menu_item_enable("Enable");
-std::vector<DummyAction*> datalogger_menu_items = {
-    &datalogger_menu_item_disable,
-    &datalogger_menu_item_enable,
+extern unsigned long datalogger_interval;
+DummyAction datalogger_interval_menu_item_1s("1s");
+DummyAction datalogger_interval_menu_item_30s("30s");
+DummyAction datalogger_interval_menu_item_1m("1m");
+DummyAction datalogger_interval_menu_item_5m("5m");
+DummyAction datalogger_interval_menu_item_10m("10m");
+DummyAction datalogger_interval_menu_item_30m("30m");
+DummyAction datalogger_interval_menu_item_1h("1h");
+DummyAction datalogger_interval_menu_item_2h("2h");
+DummyAction datalogger_interval_menu_item_6h("6h");
+DummyAction datalogger_interval_menu_item_12h("12h");
+DummyAction datalogger_interval_menu_item_1d("1d");
+std::vector<DummyAction*> datalogger_interval_menu_items = {
+    &datalogger_interval_menu_item_1s,
+    &datalogger_interval_menu_item_30s,
+    &datalogger_interval_menu_item_1m,
+    &datalogger_interval_menu_item_5m,
+    &datalogger_interval_menu_item_10m,
+    &datalogger_interval_menu_item_30m,
+    &datalogger_interval_menu_item_1h,
+    &datalogger_interval_menu_item_2h,
+    &datalogger_interval_menu_item_6h,
+    &datalogger_interval_menu_item_12h,
+    &datalogger_interval_menu_item_1d,
 };
-std::vector<int> datalogger_menu_item_map = {0, 1};
-void datalogger_callback(int nval) {
+std::vector<int> datalogger_interval_menu_item_map = {
+    1000,
+    30 * 1000,
+    60 * 1000,
+    5 * 60 * 1000,
+    10 * 60 * 1000,
+    30 * 60 * 1000,
+    60 * 60 * 1000,
+    2 * 60 * 60 * 1000,
+    6 * 60 * 60 * 1000,
+    12 * 60 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+};
+void datalogger_interval_callback(int nval) {
+    preferences.putULong(KEY_DATALOGGER_INTERVAL, nval);
+    ESP_LOGI("DATALOGGER", "Interval set to %dms", nval);
+}
+RadioMenu datalogger_interval_menu(
+    datalogger_interval_menu_items,
+    (int&)datalogger_interval,
+    datalogger_interval_menu_item_map,
+    datalogger_interval_callback,
+    &is_session_running
+);
+OpenScreenAction open_datalogger_interval_menu("Interval", &datalogger_interval_menu);
+
+extern bool is_datalogger_enabled;
+DummyAction datalogger_state_menu_item_disable("Disable");
+DummyAction datalogger_state_menu_item_enable("Enable");
+std::vector<DummyAction*> datalogger_state_menu_items = {
+    &datalogger_state_menu_item_disable,
+    &datalogger_state_menu_item_enable,
+};
+std::vector<int> datalogger_state_menu_item_map = {0, 1};
+void datalogger_state_callback(int nval) {
     preferences.putBool(KEY_DATALOGGER_ENABLE, nval);
     ESP_LOGI("DATALOGGER", "State set to %d", nval);
 }
-RadioMenu datalogger_menu(
-    datalogger_menu_items,
+RadioMenu datalogger_state_menu(
+    datalogger_state_menu_items,
     (int&)is_datalogger_enabled,
-    datalogger_menu_item_map,
-    datalogger_callback,
+    datalogger_state_menu_item_map,
+    datalogger_state_callback,
     &is_session_running
 );
+OpenScreenAction open_datalogger_state_menu("Logging", &datalogger_state_menu);
+
+std::vector<Action*> datalogger_menu_items = {
+    &open_datalogger_interval_menu,
+    &open_datalogger_state_menu,
+};
+Menu datalogger_menu(datalogger_menu_items, &is_session_running);
 OpenScreenAction open_datalogger_menu("Datalogger", &datalogger_menu);
 
 DummyAction open_sensor_config_menu("Config");
@@ -311,6 +372,7 @@ void do_clear_datalog() {
     if(LittleFS.exists("/data.log")) {
         File f = LittleFS.open("/data.log", "w");
         f.close();
+        open_notification("Log file cleared");
         ESP_LOGI("DATALOGGER", "Log file cleared");
     } else {
         open_notification("File does not\nexisted");
@@ -350,8 +412,6 @@ void do_open_webserver() {
         open_notification("Server ended");
         open_webserver.name = "Start Server";
     } else {
-        open_notification("Starting server");
-
         extern void setup_webserver();
         setup_webserver();
         IPAddress ip = WiFi.localIP();
@@ -374,8 +434,6 @@ std::vector<Action*> main_menu_items = {
 Menu main_menu(main_menu_items);
 
 void ui_init() {
-    toggle_telemetry.name = is_telemetry_enabled ? "Disable" : "Enable";
-
     live_data_menu_items.reserve(SENS_COUNT);
     for(unsigned i = 0; i < SENS_COUNT; i++) {
         if(!SENSOR_ALIVE(i)) continue;

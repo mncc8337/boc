@@ -13,7 +13,6 @@ CheckBoxMenu::CheckBoxMenu(
 )
     : Menu((std::vector<Action*> &)items, block_flag),
       item_mask(item_mask),
-      item_mask_buffer(item_mask),
       bit_map(bit_map),
       callback(callback) {
     item_selected = 0;
@@ -62,6 +61,8 @@ void CheckBoxMenu::open_callback() {
     for(unsigned i = 0; i < items.size(); i++) {
         items[i]->icon = BITMAP_CHECKBOX;
     }
+
+    item_mask_buffer = item_mask;
 }
 
 void CheckBoxMenu::close_callback() {

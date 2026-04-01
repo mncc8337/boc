@@ -279,7 +279,6 @@ void sensors_task(void *parameters) {
         if(is_session_running) {
             sensors_event_t t_event;
 
-            printf("%X %X %X\n", sensor_mask, lognsend_mask, ready_mask);
             for(unsigned i = 0; i < SENS_COUNT; i++) {
                 if(!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i) || ((ready_mask >> i) & 1)) continue;
 
