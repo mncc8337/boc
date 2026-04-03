@@ -10,8 +10,6 @@ class Action;
 class DummyAction;
 class Adafruit_Sensor;
 
-typedef uint16_t CheckBoxMask;
-
 extern void open_notification(std::string message);
 
 class Screen {
@@ -109,19 +107,20 @@ public:
     bool is_blocked() override;
 };
 
+template <typename T>
 class RadioMenu: public Menu {
 private:
     int radio_state = 0;
-    int &bound_target;
-    std::vector<int> &value_map;
-    void (*callback)(int new_val);
+    T &bound_target;
+    std::vector<T> &value_map;
+    void (*callback)(T new_val);
 
 public:
     RadioMenu(
         std::vector<DummyAction*> &items,
-        int &bound_target,
-        std::vector<int> &value_map,
-        void (*callback)(int new_val),
+        T &bound_target,
+        std::vector<T> &value_map,
+        void (*callback)(T new_val),
         bool *block_flag=nullptr
     );
     void process_navigation(
@@ -134,19 +133,20 @@ public:
     void close_callback() override;
 };
 
+template <typename T>
 class CheckBoxMenu: public Menu {
 private:
-    CheckBoxMask item_mask_buffer;
-    CheckBoxMask &item_mask;
+    T item_mask_buffer;
+    T &item_mask;
     std::vector<unsigned> &bit_map;
-    void (*callback)(CheckBoxMask new_val);
+    void (*callback)(T new_val);
 
 public:
     CheckBoxMenu(
         std::vector<DummyAction*> &items,
-        CheckBoxMask &item_mask,
+        T &item_mask,
         std::vector<unsigned> &bit_map,
-        void (*callback)(CheckBoxMask new_val),
+        void (*callback)(T new_val),
         bool *block_flag=nullptr
     );
     void process_navigation(

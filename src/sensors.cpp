@@ -1,4 +1,3 @@
-#include "Arduino.h"
 #include <sensors.h>
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
@@ -253,14 +252,20 @@ void set_live_data_sampling_interval(unsigned long sampling_interval) {
     if(sensors_task_handle != NULL) xTaskNotifyGive(sensors_task_handle); 
 }
 
-bool live_data_ready(sensors_event_t &out_event) {
+bool is_live_data_ready(sensors_event_t &out_event) {
     if(xQueueReceive(live_data_event_queue, &out_event, 2) == pdPASS) {
         return true;
     }
     return false;
 }
 
-bool all_data_poll_ready(sensors_data_t &out_data) {
+static unsigned long session_data_sampling_interval = 100;
+void set_session_data_sampling_interval(unsigned long sampling_interval) {
+    session_data_sampling_interval = sampling_interval;
+    if(sensors_task_handle != NULL) xTaskNotifyGive(sensors_task_handle); 
+}
+
+bool is_session_data_ready(sensors_data_t &out_data) {
     if(xQueueReceive(all_lognsend_sensor_data_queue, &out_data, 2) == pdPASS) {
         return true;
     }
@@ -271,95 +276,125 @@ extern bool is_session_running;
 void sensors_task(void *parameters) {
     uint8_t ready_mask = 0;
     sensors_data_t all_data = {0};
+    sensors_event_t t_event;
+
+    long time_till_live = 0;
+    long time_till_session = 0;
+
+    unsigned long last_iterate_ts = millis();
 
     while(true) {
-        int live_data_local_id = live_data_sensor_id;
+        unsigned long now_ts = millis();
+        unsigned long last_iterate_time = now_ts - last_iterate_ts;
+        last_iterate_ts = now_ts;
 
-        // poll all enabled sensors
+        bool live_data_needed = (
+            live_data_sensor_id >= 0 && SENSOR_ALIVE(live_data_sensor_id)
+        );
+
+        if(live_data_needed)
+            time_till_live -= last_iterate_time;
+        else
+            time_till_live = 1;
+
+        if(is_session_running)
+            time_till_session -= last_iterate_time;
+        else
+            time_till_session = 1;
+
+        unsigned long execution_start = now_ts;
+
         if(is_session_running) {
-            sensors_event_t t_event;
+            if(time_till_session <= 0 || ready_mask != 0) {
+                for(unsigned i = 0; i < SENS_COUNT; i++) {
+                    if(
+                        !SENSOR_ALIVE(i)
+                        || !SENSOR_ACTIVE(i)
+                        || ((ready_mask >> i) & 1)
+                    ) continue;
 
-            for(unsigned i = 0; i < SENS_COUNT; i++) {
-                if(!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i) || ((ready_mask >> i) & 1)) continue;
+                    bool ready = sensors[i]->getEvent(&t_event);
+                    if(!ready) continue;
 
-                bool ready = sensors[i]->getEvent(&t_event);
-                if(!ready) continue;
+                    t_event.sensor_id = i;
+                    ready_mask |= 1 << i;
 
-                t_event.sensor_id = i;
-                ready_mask |= 1 << i;
+                    if(i == live_data_sensor_id && live_data_needed) {
+                        xQueueOverwrite(live_data_event_queue, &t_event);
+                        time_till_live += live_data_sampling_interval;
+                        if(time_till_live < 0) time_till_live = 0;
+                    }
 
-                // poll live data sensor
-                if(i == live_data_local_id)
-                    xQueueOverwrite(live_data_event_queue, &t_event);
+                    switch(i) {
+                        case SENS_TEMPERATURE:
+                            all_data.temperature = t_event.temperature;
+                            break;
+                        case SENS_HUMIDITY:
+                            all_data.humidity = t_event.relative_humidity;
+                            break;
+                        case SENS_PRESSURE:
+                            all_data.pressure = t_event.pressure;
+                            break;
+                        case SENS_LIGHT:
+                            all_data.light = t_event.light;
+                            break;
+                        case SENS_ACCELERATION: 
+                            all_data.accel[0] = t_event.acceleration.x;
+                            all_data.accel[1] = t_event.acceleration.y;
+                            all_data.accel[2] = t_event.acceleration.z;
+                            break;
+                        case SENS_GYROSCOPE:
+                            all_data.gyro[0] = t_event.gyro.x;
+                            all_data.gyro[1] = t_event.gyro.y;
+                            all_data.gyro[2] = t_event.gyro.z;
+                            break;
+                    }
+                }
 
-                switch(i) {
-                    case SENS_TEMPERATURE:
-                        all_data.temperature = t_event.temperature;
-                        break;
-                    case SENS_HUMIDITY:
-                        all_data.humidity = t_event.relative_humidity;
-                        break;
-                    case SENS_PRESSURE:
-                        all_data.pressure = t_event.pressure;
-                        break;
-                    case SENS_LIGHT:
-                        all_data.light = t_event.light;
-                        break;
-                    case SENS_ACCELERATION: 
-                        all_data.accel[0] = t_event.acceleration.x;
-                        all_data.accel[1] = t_event.acceleration.y;
-                        all_data.accel[2] = t_event.acceleration.z;
-                        break;
-                    case SENS_GYROSCOPE:
-                        all_data.gyro[0] = t_event.gyro.x;
-                        all_data.gyro[1] = t_event.gyro.y;
-                        all_data.gyro[2] = t_event.gyro.z;
-                        break;
+                if(ready_mask == lognsend_mask) {
+                    xQueueOverwrite(all_lognsend_sensor_data_queue, &all_data);
+                    ready_mask = 0;
+                    all_data = {0};
+                    time_till_session += session_data_sampling_interval;
+                    if(time_till_session < 0) time_till_session = 0;
                 }
             }
-
-            if(ready_mask == lognsend_mask) {
-                xQueueOverwrite(all_lognsend_sensor_data_queue, &all_data);
-                ready_mask = 0;
-                all_data = {0};
-                // data packet isnt sent that regularly
-                ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(100));
-                continue;
-            }
-            // repoll, some sensors aint ready
         } else {
-            // poll live data sensor
-            if(live_data_local_id >= 0 && SENSOR_ALIVE(live_data_local_id)) {
-                sensors_event_t t_event;
-                bool ready = sensors[live_data_local_id]->getEvent(&t_event);
+            ready_mask = 0;
+        }
+
+        if(live_data_needed) {
+            if(time_till_live <= 0) {
+                bool ready = sensors[live_data_sensor_id]->getEvent(&t_event);
 
                 if(ready) {
-                    t_event.sensor_id = live_data_local_id;
+                    t_event.sensor_id = live_data_sensor_id;
                     xQueueOverwrite(live_data_event_queue, &t_event);
-
-                    unsigned long now = millis();
-                    static unsigned long next_target_time = now;
-                    unsigned long local_sampling_interval = live_data_sampling_interval;
-
-                    if(now > next_target_time + local_sampling_interval)
-                        next_target_time = now;
-
-                    next_target_time += local_sampling_interval;
-
-                    if(next_target_time > now) {
-                        unsigned long sleep_time = next_target_time - now;
-                        if(sleep_time > 5) sleep_time -= 5;
-                        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(sleep_time));
-                        continue;
-                    } else {
-                        next_target_time = now;
-                        continue;
-                    }
+                    time_till_live += live_data_sampling_interval;
+                    if(time_till_live < 0) time_till_live = 0;
                 }
             }
         }
 
-        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10));
+        unsigned long execution_time = millis() - execution_start;
+        long time_to_sleep = 1000;
+
+        if(live_data_needed) {
+            if(time_till_live < time_to_sleep) time_to_sleep = time_till_live;
+        }
+
+        if(is_session_running) {
+            if(ready_mask != 0) {
+                time_to_sleep = 10;
+            } else if(time_till_session < time_to_sleep) {
+                time_to_sleep = time_till_session;
+            }
+        }
+
+        time_to_sleep -= execution_time;
+        if(time_to_sleep < 10) time_to_sleep = 10;
+
+        ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(time_to_sleep));
     }
 
     vTaskDelete(NULL);

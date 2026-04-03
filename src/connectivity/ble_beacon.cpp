@@ -1,9 +1,6 @@
 #include <connectivity.h>
 #include <NimBLEDevice.h>
-#include <NimBLEUtils.h>
-
 #include <sensors.h>
-#include <Adafruit_Sensor.h>
 
 static void make_ble_beacon_payload(const sensors_data_t &data, std::vector<uint8_t>& payload) {
     payload.clear();

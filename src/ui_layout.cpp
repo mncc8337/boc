@@ -6,7 +6,6 @@
 #include <bitmap.h>
 
 #include <sensors.h>
-#include <Adafruit_Sensor.h>
 
 #include <connectivity.h>
 
@@ -21,15 +20,15 @@
 #include <FS.h>
 
 extern bool is_session_running;
+extern bool is_datalogger_enabled;
+extern unsigned long datalogger_interval;
+extern bool is_telemetry_enabled;
 extern U8G2 u8g2;
-extern Preferences preferences;
 extern TelemetryType telemetry_type;
 extern File logfile;
 
 void toggle_session_func() {
     extern FunctionAction toggle_session;
-    extern bool is_telemetry_enabled;
-    extern bool is_datalogger_enabled;
 
     if(is_session_running) {
         if(is_telemetry_enabled) {
@@ -91,6 +90,20 @@ void toggle_session_func() {
             open_notification("Session started");
             ESP_LOGI("SESSION", "Session started");
             is_session_running = true;
+
+            // set polling rate
+            if(is_datalogger_enabled && !is_telemetry_enabled) {
+                set_session_data_sampling_interval(datalogger_interval);
+            } else if(!is_datalogger_enabled && is_telemetry_enabled) {
+                set_session_data_sampling_interval(100);
+            } else {
+                // if both enabled then set to the smaller one
+                if(100 < datalogger_interval) {
+                    set_session_data_sampling_interval(100);
+                } else {
+                    set_session_data_sampling_interval(datalogger_interval);
+                }
+            }
         } else {
             open_notification("No job to do\nPlease turn on\neither telemetry\nor datalogger");
         }
@@ -106,38 +119,43 @@ std::vector<DummyAction*> connectivity_menu_items = {
     &ble_beacon_option,
     &wifi_option
 };
-std::vector<int> connectivity_menu_item_map = {
+std::vector<TelemetryType> connectivity_menu_item_map = {
     BLE_SERVER,
     BLE_BEACON,
     WIFI,
 };
-void connectivity_callback(int nval) {
-    preferences.putUChar(KEY_TELEMETRY_TYPE, nval);
+void connectivity_callback(TelemetryType nval) {
+    Preferences pref;
+    pref.begin(PREFERENCES, false);
+    pref.putUChar(KEY_TELEMETRY_TYPE, nval);
+    pref.end();
     ESP_LOGI("TELEMETRY", "Set connectivity to %d", nval);
 }
-RadioMenu connectivity_menu(
+RadioMenu<TelemetryType> connectivity_menu(
     connectivity_menu_items,
-    (int&)telemetry_type,
+    telemetry_type,
     connectivity_menu_item_map,
     connectivity_callback
 );
 OpenScreenAction open_connectivity_menu("Connectivity", &connectivity_menu);
 
-extern bool is_telemetry_enabled;
 DummyAction telemetry_state_menu_item_disable("Disable");
 DummyAction telemetry_state_menu_item_enable("Enable");
 std::vector<DummyAction*> telemetry_state_menu_items = {
     &telemetry_state_menu_item_disable,
     &telemetry_state_menu_item_enable,
 };
-std::vector<int> telemetry_state_menu_item_map = {0, 1};
-void telemetry_state_callback(int nval) {
-    preferences.putBool(KEY_TELEMETRY_ENABLE, nval);
+std::vector<bool> telemetry_state_menu_item_map = {false, true};
+void telemetry_state_callback(bool nval) {
+    Preferences pref;
+    pref.begin(PREFERENCES, false);
+    pref.putBool(KEY_TELEMETRY_ENABLE, nval);
+    pref.end();
     ESP_LOGI("TELEMETRY", "State set to %d", nval);
 }
-RadioMenu telemetry_state_menu(
+RadioMenu<bool> telemetry_state_menu(
     telemetry_state_menu_items,
-    (int&)is_telemetry_enabled,
+    is_telemetry_enabled,
     telemetry_state_menu_item_map,
     telemetry_state_callback,
     &is_session_running
@@ -151,7 +169,6 @@ std::vector<Action*> telemetry_menu_items = {
 Menu telemetry_menu(telemetry_menu_items, &is_session_running);
 OpenScreenAction open_telemetry_menu("Telemetry", &telemetry_menu);
 
-extern unsigned long datalogger_interval;
 DummyAction datalogger_interval_menu_item_1s("1s");
 DummyAction datalogger_interval_menu_item_30s("30s");
 DummyAction datalogger_interval_menu_item_1m("1m");
@@ -176,7 +193,7 @@ std::vector<DummyAction*> datalogger_interval_menu_items = {
     &datalogger_interval_menu_item_12h,
     &datalogger_interval_menu_item_1d,
 };
-std::vector<int> datalogger_interval_menu_item_map = {
+std::vector<unsigned long> datalogger_interval_menu_item_map = {
     1000,
     30 * 1000,
     60 * 1000,
@@ -189,34 +206,39 @@ std::vector<int> datalogger_interval_menu_item_map = {
     12 * 60 * 60 * 1000,
     24 * 60 * 60 * 1000,
 };
-void datalogger_interval_callback(int nval) {
-    preferences.putULong(KEY_DATALOGGER_INTERVAL, nval);
+void datalogger_interval_callback(unsigned long nval) {
+    Preferences pref;
+    pref.begin(PREFERENCES, false);
+    pref.putULong(KEY_DATALOGGER_INTERVAL, nval);
+    pref.end();
     ESP_LOGI("DATALOGGER", "Interval set to %dms", nval);
 }
-RadioMenu datalogger_interval_menu(
+RadioMenu<unsigned long> datalogger_interval_menu(
     datalogger_interval_menu_items,
-    (int&)datalogger_interval,
+    datalogger_interval,
     datalogger_interval_menu_item_map,
     datalogger_interval_callback,
     &is_session_running
 );
 OpenScreenAction open_datalogger_interval_menu("Interval", &datalogger_interval_menu);
 
-extern bool is_datalogger_enabled;
 DummyAction datalogger_state_menu_item_disable("Disable");
 DummyAction datalogger_state_menu_item_enable("Enable");
 std::vector<DummyAction*> datalogger_state_menu_items = {
     &datalogger_state_menu_item_disable,
     &datalogger_state_menu_item_enable,
 };
-std::vector<int> datalogger_state_menu_item_map = {0, 1};
-void datalogger_state_callback(int nval) {
-    preferences.putBool(KEY_DATALOGGER_ENABLE, nval);
+std::vector<bool> datalogger_state_menu_item_map = {false, true};
+void datalogger_state_callback(bool nval) {
+    Preferences pref;
+    pref.begin(PREFERENCES, false);
+    pref.putBool(KEY_DATALOGGER_ENABLE, nval);
+    pref.end();
     ESP_LOGI("DATALOGGER", "State set to %d", nval);
 }
-RadioMenu datalogger_state_menu(
+RadioMenu<bool> datalogger_state_menu(
     datalogger_state_menu_items,
-    (int&)is_datalogger_enabled,
+    is_datalogger_enabled,
     datalogger_state_menu_item_map,
     datalogger_state_callback,
     &is_session_running
@@ -235,10 +257,10 @@ DummyAction open_sensor_config_menu("Config");
 extern sensor_mask_t lognsend_mask;
 std::vector<DummyAction*> lognsend_menu_items = {};
 std::vector<unsigned> lognsend_menu_bit_map = {};
-void lognsend_callback(CheckBoxMask nmask) {
+void lognsend_callback(sensor_mask_t nmask) {
     ESP_LOGD("SENSORS", "New log & send mask: 0x%X", nmask);
 }
-CheckBoxMenu lognsend_menu(
+CheckBoxMenu<sensor_mask_t> lognsend_menu(
     lognsend_menu_items,
     lognsend_mask,
     lognsend_menu_bit_map,
@@ -254,7 +276,7 @@ std::vector<Action*> sensors_menu_items = {
 Menu sensors_menu(sensors_menu_items, &is_session_running);
 OpenScreenAction open_sensors_menu("Sensors", &sensors_menu);
 
-extern unsigned long screen_brightness;
+extern uint8_t screen_brightness;
 DummyAction screen_brightness_menu_item_10("10");
 DummyAction screen_brightness_menu_item_25("25");
 DummyAction screen_brightness_menu_item_50("50");
@@ -267,14 +289,17 @@ std::vector<DummyAction*> screen_brightness_menu_items = {
     &screen_brightness_menu_item_75,
     &screen_brightness_menu_item_100,
 };
-std::vector<int> screen_brightness_menu_item_map = {8, 26, 64, 128, 255};
-void brightness_callback(int nval) {
-    preferences.putUChar(KEY_SCREEN_BRIGHTNESS, nval);
+std::vector<uint8_t> screen_brightness_menu_item_map = {8, 26, 64, 128, 255};
+void brightness_callback(uint8_t nval) {
+    Preferences pref;
+    pref.begin(PREFERENCES, false);
+    pref.putUChar(KEY_SCREEN_BRIGHTNESS, nval);
+    pref.end();
     ESP_LOGI("SCREEN", "Brightness set to %d", nval);
 }
-RadioMenu screen_brightness_menu(
+RadioMenu<uint8_t> screen_brightness_menu(
     screen_brightness_menu_items,
-    (int&)screen_brightness,
+    screen_brightness,
     screen_brightness_menu_item_map,
     brightness_callback
 );
@@ -291,19 +316,22 @@ std::vector<DummyAction*> screen_timeout_menu_items = {
     &screen_timeout_menu_item_5m,
     &screen_timeout_menu_item_10m,
 };
-std::vector<int> screen_timeout_menu_item_map = {
+std::vector<unsigned long> screen_timeout_menu_item_map = {
     30000,
     3 * 60000,
     5 * 60000,
     10 * 60000,
 };
-void screen_timeout_callback(int nval) {
-    preferences.putULong(KEY_SCREEN_TIMEOUT, nval);
+void screen_timeout_callback(unsigned long nval) {
+    Preferences pref;
+    pref.begin(PREFERENCES, false);
+    pref.putULong(KEY_SCREEN_TIMEOUT, nval);
+    pref.end();
     ESP_LOGI("SCREEN", "Timeout set to %d", nval);
 }
-RadioMenu screen_timeout_menu(
+RadioMenu<unsigned long> screen_timeout_menu(
     screen_timeout_menu_items,
-    (int&)screen_timeout,
+    screen_timeout,
     screen_timeout_menu_item_map,
     screen_timeout_callback
 );
@@ -365,9 +393,6 @@ void do_sync_time() {
 }
 FunctionAction sync_time("Sync Time", do_sync_time);
 
-InfoScreen info_screen_instance;
-OpenScreenAction open_info_menu("Info", &info_screen_instance);
-
 void do_clear_datalog() {
     if(LittleFS.exists("/data.log")) {
         File f = LittleFS.open("/data.log", "w");
@@ -383,7 +408,7 @@ FunctionAction clear_datalog("Clear datalog", do_clear_datalog);
 FunctionAction reboot("Reboot", esp_restart);
 
 extern void shutdown();
-FunctionAction toggle_shutdown("Shutdown", shutdown);
+FunctionAction do_shutdown("Shutdown", shutdown);
 
 std::vector<Action*> settings_menu_items = {
     &open_telemetry_menu,
@@ -391,10 +416,9 @@ std::vector<Action*> settings_menu_items = {
     &open_sensors_menu,
     &open_screen_menu,
     &sync_time,
-    &open_info_menu,
     &clear_datalog,
     &reboot,
-    &toggle_shutdown,
+    &do_shutdown,
 };
 Menu settings_menu(settings_menu_items);
 OpenScreenAction open_settings_menu("Settings", &settings_menu);
@@ -421,15 +445,25 @@ void do_open_webserver() {
 }
 FunctionAction open_webserver("Start Server", do_open_webserver);
 
+InfoScreen info_screen_instance;
+OpenScreenAction open_info_menu("Info", &info_screen_instance);
+
 SplashScreen splash_screen;
 OpenScreenAction open_splash_screen("Splash GIF", &splash_screen);
 
+std::vector<Action*> tools_menu_items = {
+    &open_live_data_menu,
+    &open_webserver,
+    &open_info_menu,
+    &open_splash_screen,
+};
+Menu tools_menu(tools_menu_items);
+OpenScreenAction open_tools_menu("Tools", &tools_menu);
+
 std::vector<Action*> main_menu_items = {
     &toggle_session,
-    &open_live_data_menu,
     &open_settings_menu,
-    &open_webserver,
-    &open_splash_screen
+    &open_tools_menu,
 };
 Menu main_menu(main_menu_items);
 

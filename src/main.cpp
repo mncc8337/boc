@@ -1,4 +1,3 @@
-#include "data_logger.h"
 #include <Arduino.h>
 #include <Wire.h>
 #include <LittleFS.h>
@@ -12,6 +11,7 @@
 #include <sensors.h>
 #include <ui_layout.h>
 #include <connectivity.h>
+#include <data_logger.h>
 
 // littlefs format
 #define FORMAT_IF_FAILED true
@@ -29,8 +29,6 @@
 #define BUTTON_SELECT_PIN 4
 
 #define BATTERY_PIN 0
-
-Preferences preferences;
 
 volatile bool is_session_running = false;
 
@@ -57,10 +55,10 @@ Screen *current_screen;
 Screen *screen_stack[8];
 unsigned screen_stack_ptr = 0;
 
-void draw_frame() {
-    if(!current_screen->is_overlay())
+void draw_frame(Screen *screen) {
+    if(!screen->is_overlay())
         u8g2.clearBuffer();
-    current_screen->draw(u8g2);
+    screen->draw(u8g2);
     u8g2.setContrast(screen_brightness);
     u8g2.sendBuffer();
 }
@@ -82,9 +80,8 @@ void open_screen(Screen *screen, bool forced=false) {
 
     sleep_lock = current_screen->prevent_sleep();
 
-    if(forced) {
-        draw_frame();
-    }
+    if(forced)
+        draw_frame(current_screen);
 
     ESP_LOGD("UI", "Screen 0x%X opened", current_screen);
 }
@@ -97,20 +94,19 @@ void open_prev_screen() {
     ESP_LOGD("UI", "Screen 0x%X opened", current_screen);
 }
 
+void i2c_init() {
+}
+
 void shutdown() {
     ESP_LOGI("SYSTEM", "Shutting down");
 
-    sleep_sensors();
-    u8g2.setPowerSave(1);
     Wire.end();
+
     pinMode(SDA_PIN, INPUT);
     pinMode(SCL_PIN, INPUT);
 
-    // TODO:
-    // do some hardware tricks to actually cut the power off all peripherals
-
     // config deep sleep wake pin
-    pinMode(BUTTON_SELECT_PIN, INPUT_PULLUP);
+    pinMode(BUTTON_SELECT_PIN, INPUT_PULLDOWN);
     esp_deep_sleep_enable_gpio_wakeup(1ULL << BUTTON_SELECT_PIN, ESP_GPIO_WAKEUP_GPIO_HIGH);
     esp_deep_sleep_start();
 }
@@ -121,36 +117,38 @@ void turn_off_screen() {
     u8g2.setPowerSave(1);
 
     if(!is_session_running && !is_webserver_running) {
+        // wait for button release
+        while(digitalRead(BUTTON_SELECT_PIN) == HIGH) delay(10);
+
+        if(sensors_task_handle)
+            vTaskSuspend(sensors_task_handle);
+
         sleep_sensors();
+
         gpio_wakeup_enable((gpio_num_t)BUTTON_SELECT_PIN, GPIO_INTR_HIGH_LEVEL);
         esp_sleep_enable_gpio_wakeup();
-
-        // wait for button release
-        while(digitalRead(BUTTON_SELECT_PIN) != LOW) delay(10);
-
-        Wire.end();
-        pinMode(SDA_PIN, INPUT);
-        pinMode(SCL_PIN, INPUT);
 
         ESP_LOGI("SYSTEM", "Starting light sleep");
         esp_light_sleep_start();
 
-        Wire.begin(SDA_PIN, SCL_PIN);
-
         // the esp wakes up right there
         // also wait for button release
-        while(digitalRead(BUTTON_SELECT_PIN) != LOW) delay(10);
+        while(digitalRead(BUTTON_SELECT_PIN) == HIGH) delay(10);
         ESP_LOGI("SYSTEM", "Waken up from light sleep");
 
         wake_sensors();
+
+        if(sensors_task_handle)
+            vTaskResume(sensors_task_handle);
+
         u8g2.setPowerSave(0);
 
         return; // no need to set flag
-    } else {
-        set_low_power_sensor_mode();
-        setCpuFrequencyMhz(80);
-        ESP_LOGI("SYSTEM", "Entered low power mode");
     }
+
+    set_low_power_sensor_mode();
+    setCpuFrequencyMhz(80);
+    ESP_LOGI("SYSTEM", "Entered low power mode");
 
     screen_off = true;
 }
@@ -176,6 +174,15 @@ uint32_t psu_voltage_sum = 0;
 uint16_t psu_voltage_avg = 0;
 uint8_t battery_percentage = 0;
 
+void battery_readings_init() {
+    uint32_t raw = analogReadMilliVolts(BATTERY_PIN) * 2;
+    for(unsigned i = 0; i < VOLTAGE_HISTORY_SIZE; i++) {
+        psu_voltage_history[i] = raw;
+    }
+    psu_voltage_avg = raw;
+    psu_voltage_sum = raw * VOLTAGE_HISTORY_SIZE;
+}
+
 void update_battery_readings() {
     uint32_t raw = analogReadMilliVolts(BATTERY_PIN) * 2;
     static uint32_t history_ptr = 0;
@@ -197,7 +204,7 @@ void update_battery_readings() {
     } else if(psu_voltage_avg > 3200) {
         battery_percentage = (uint8_t)((psu_voltage_avg - 3200) / 30);
     } else {
-        battery_percentage = 0;
+        shutdown();
     }
 }
 
@@ -206,13 +213,24 @@ void setup() {
     pinMode(BUTTON_DOWN_PIN, INPUT);
     pinMode(BUTTON_SELECT_PIN, INPUT);
 
+    pinMode(BATTERY_PIN, INPUT);
+
     setenv("TZ", TZ_INFO, 1);
     tzset();
 
-    pinMode(BATTERY_PIN, INPUT);
+    battery_readings_init();
 
-    for(unsigned i = 0; i < VOLTAGE_HISTORY_SIZE; i++)
-        update_battery_readings();
+    // load saved settings
+    Preferences pref;
+    pref.begin(PREFERENCES, true);
+    screen_timeout = pref.getULong(KEY_SCREEN_TIMEOUT, 3 * 60000);
+    screen_brightness = pref.getUChar(KEY_SCREEN_BRIGHTNESS, 128);
+    is_datalogger_enabled = pref.getBool(KEY_DATALOGGER_ENABLE, false);
+    datalogger_interval = pref.getULong(KEY_DATALOGGER_INTERVAL, 3 * 60 * 1000);
+    is_telemetry_enabled = pref.getBool(KEY_TELEMETRY_ENABLE, false);
+    telemetry_type = (TelemetryType)pref.getUChar(KEY_TELEMETRY_TYPE, BLE_SERVER);
+    pref.end();
+    ESP_LOGI("SYSTEM", "Loaded saved settings");
 
     Wire.begin(SDA_PIN, SCL_PIN);
 
@@ -256,16 +274,6 @@ void setup() {
     } else {
         ESP_LOGI("SYSTEM", "LittleFS mounted");
     }
-
-    // load saved settings
-    preferences.begin("settings", false);
-    screen_timeout = preferences.getULong(KEY_SCREEN_TIMEOUT, 3 * 60000);
-    screen_brightness = preferences.getUChar(KEY_SCREEN_BRIGHTNESS, 128);
-    is_datalogger_enabled = preferences.getBool(KEY_DATALOGGER_ENABLE, false);
-    datalogger_interval = preferences.getULong(KEY_DATALOGGER_INTERVAL, 3 * 60 * 1000);
-    is_telemetry_enabled = preferences.getBool(KEY_TELEMETRY_ENABLE, false);
-    telemetry_type = (TelemetryType)preferences.getUChar(KEY_TELEMETRY_TYPE, BLE_SERVER);
-    ESP_LOGI("SYSTEM", "Loaded saved settings");
 
     ui_init();
     ESP_LOGI("SYSTEM", "UI initialized");
@@ -311,7 +319,7 @@ void loop() {
     bool sensors_data_retrieved = false;
 
     if(current_ts - last_telemetry_packet_ts > 100 && is_session_running && is_telemetry_enabled) {
-        if(all_data_poll_ready(sensors_data)) {
+        if(is_session_data_ready(sensors_data)) {
             switch(telemetry_type) {
                 case BLE_BEACON: {
                     ble_beacon_set_data(sensors_data);
@@ -331,12 +339,15 @@ void loop() {
     }
 
     if(
-        current_ts - last_data_log_ts > datalogger_interval
+        (
+            current_ts - last_data_log_ts > datalogger_interval
+            || force_file_flush
+        )
         && is_session_running
         && is_datalogger_enabled
         && (
             sensors_data_retrieved
-            || all_data_poll_ready(sensors_data)
+            || is_session_data_ready(sensors_data)
         )
     ) {
         write_log_packet(logfile, sensors_data);
@@ -359,6 +370,7 @@ void loop() {
     ) {
         unflushed_data = false;
         last_flush_ts = current_ts;
+        force_file_flush = false;
         logfile.flush();
         ESP_LOGD("DATALOGGER", "Data flushed");
     }
@@ -424,7 +436,7 @@ void loop() {
         );
 
         if(current_screen->redraw_request) {
-            draw_frame();
+            draw_frame(current_screen);
         }
     } else {
         if(button_select_press_time > 0) {

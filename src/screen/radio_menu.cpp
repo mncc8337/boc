@@ -1,25 +1,23 @@
 #include <screen.h>
 #include <action.h>
 #include <bitmap.h>
+#include <connectivity.h>
 
-RadioMenu::RadioMenu(
+template <typename T>
+RadioMenu<T>::RadioMenu(
     std::vector<DummyAction*> &items,
-    int &bound_target,
-    std::vector<int> &value_map,
-    void (*callback)(int new_value),
+    T &bound_target,
+    std::vector<T> &value_map,
+    void (*callback)(T new_value),
     bool *block_flag
 )
-    : Menu((std::vector<Action*> &)items, block_flag),
-      bound_target(bound_target),
-      value_map(value_map),
-      callback(callback) {
-    item_selected = -1;
-    for(unsigned i = 0; i < items.size(); i++) {
-        items[i]->icon = BITMAP_RADIOBUTTON;
-    }
-}
+    :   Menu((std::vector<Action*> &)items, block_flag),
+        bound_target(bound_target),
+        value_map(value_map),
+        callback(callback) {}
 
-void RadioMenu::process_navigation(
+template <typename T>
+void RadioMenu<T>::process_navigation(
     unsigned long button_select_press_duration,
     bool button_up_clicked,
     bool button_down_clicked
@@ -36,7 +34,8 @@ void RadioMenu::process_navigation(
     }
 }
 
-void RadioMenu::draw(U8G2 &u8g2) {
+template <typename T>
+void RadioMenu<T>::draw(U8G2 &u8g2) {
     Menu::draw(u8g2);
 
     if(radio_state >= item_sel_previous && radio_state <= item_sel_next) {
@@ -44,9 +43,8 @@ void RadioMenu::draw(U8G2 &u8g2) {
     }
 }
 
-void RadioMenu::open_callback() {
-    if(item_selected >= 0) return;
-
+template <typename T>
+void RadioMenu<T>::open_callback() {
     for(radio_state = 0; radio_state < items.size(); radio_state++) {
         if(value_map[radio_state] == bound_target) break;
     }
@@ -58,9 +56,20 @@ void RadioMenu::open_callback() {
     item_selected = radio_state;
     item_sel_previous = item_selected - 1;
     item_sel_next = item_selected + 1;
+
+    for(unsigned i = 0; i < items.size(); i++) {
+        items[i]->icon = BITMAP_RADIOBUTTON;
+    }
 }
 
-void RadioMenu::close_callback() {
+template <typename T>
+void RadioMenu<T>::close_callback() {
     bound_target = value_map[radio_state];
-    if(callback) callback(value_map[radio_state]);
+    if(callback) callback(bound_target);
 }
+
+template class RadioMenu<int>;
+template class RadioMenu<uint8_t>;
+template class RadioMenu<unsigned long>;
+template class RadioMenu<bool>;
+template class RadioMenu<TelemetryType>;

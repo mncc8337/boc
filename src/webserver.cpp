@@ -1,7 +1,7 @@
-#include <screen.h>
-#include <WiFi.h>
 #include <WebServer.h>
+#include <WiFi.h>
 #include <LittleFS.h>
+#include <screen.h>
 
 static WebServer server(80);
 

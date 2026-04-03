@@ -1,5 +1,4 @@
 #include <data_logger.h>
-#include <ctime>
 
 void write_log_packet(File &file, sensors_data_t &data) {
     struct __attribute__((packed)) {

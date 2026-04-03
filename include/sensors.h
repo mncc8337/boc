@@ -47,8 +47,10 @@ extern void unset_low_power_sensor_mode();
 extern void subscribe_live_data(int target_sensor, unsigned long sampling_interval);
 extern void unsubscribe_live_data();
 extern void set_live_data_sampling_interval(unsigned long sampling_interval);
-extern bool live_data_ready(sensors_event_t &out_event);
-extern bool all_data_poll_ready(sensors_data_t &out_data);
+extern bool is_live_data_ready(sensors_event_t &out_event);
+
+extern void set_session_data_sampling_interval(unsigned long sampling_interval);
+extern bool is_session_data_ready(sensors_data_t &out_data);
 
 extern TaskHandle_t sensors_task_handle;
 extern void sensors_task(void *parameters);

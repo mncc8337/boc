@@ -1,6 +1,7 @@
 #ifndef PREFERENCE_KEYS_H
 #define PREFERENCE_KEYS_H
 
+#define PREFERENCES "settings"
 #define KEY_SCREEN_TIMEOUT "scrn-timeout"
 #define KEY_SCREEN_BRIGHTNESS "scrn-bright"
 #define KEY_DATALOGGER_ENABLE "datalogger-en"

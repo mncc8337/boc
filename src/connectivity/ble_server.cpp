@@ -1,10 +1,9 @@
-#include "NimBLECharacteristic.h"
 #include <connectivity.h>
 #include <NimBLEDevice.h>
-#include <NimBLEUtils.h>
-#include <NimBLEServer.h>
 #include <sensors.h>
-#include <Adafruit_Sensor.h>
+
+const char ACCEL_UUID[] = "987e092b-840d-4bba-8e09-07e904bd4903";
+const char GYRO_UUID[] = "9520136e-3e6a-475e-82dc-c73130bfe46f";
 
 static NimBLEServer* ble_server = nullptr;
 
@@ -16,14 +15,7 @@ static NimBLECharacteristic* light_characteristic = nullptr;
 static NimBLECharacteristic* accel_characteristic = nullptr;
 static NimBLECharacteristic* gyro_characteristic = nullptr;
 
-NimBLECharacteristic **sensor_characteristic_map[] {
-    &temp_characteristic,
-    &hum_characteristic,
-    &press_characteristic,
-    &light_characteristic,
-    &accel_characteristic,
-    &gyro_characteristic,
-};
+NimBLECharacteristic **sensor_characteristic_map[SENS_COUNT] {nullptr};
 
 volatile bool device_connected = false;
 
@@ -49,44 +41,33 @@ void ble_server_start() {
     );
 
     NimBLEService* env_service = ble_server->createService("181A");
-
-    if(SENSOR_ALIVE(SENS_TEMPERATURE) && SENSOR_ACTIVE(SENS_TEMPERATURE)) {
-        temp_characteristic = env_service->createCharacteristic(
-            "2A6E", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-    }
-
-    if(SENSOR_ALIVE(SENS_HUMIDITY) && SENSOR_ACTIVE(SENS_HUMIDITY)) {
-        hum_characteristic = env_service->createCharacteristic(
-            "2A6F", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-    }
-
-    if(SENSOR_ALIVE(SENS_PRESSURE) && SENSOR_ACTIVE(SENS_PRESSURE)) {
-        press_characteristic = env_service->createCharacteristic(
-            "2A6D", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-    }
-
-    if(SENSOR_ALIVE(SENS_LIGHT) && SENSOR_ACTIVE(SENS_LIGHT)) {
-        light_characteristic = env_service->createCharacteristic(
-            "2AFB", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-    }
+    temp_characteristic = env_service->createCharacteristic(
+        "2A6E", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
+    hum_characteristic = env_service->createCharacteristic(
+        "2A6F", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
+    press_characteristic = env_service->createCharacteristic(
+        "2A6D", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
+    light_characteristic = env_service->createCharacteristic(
+        "2AFB", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
 
     NimBLEService* measurement_service = ble_server->createService("185A");
+    accel_characteristic = measurement_service->createCharacteristic(
+        ACCEL_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
+    gyro_characteristic = measurement_service->createCharacteristic(
+        GYRO_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
 
-    if(SENSOR_ALIVE(SENS_ACCELERATION) && SENSOR_ACTIVE(SENS_ACCELERATION)) {
-        accel_characteristic = measurement_service->createCharacteristic(
-            "2C06", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-    }
-
-    if(SENSOR_ALIVE(SENS_GYROSCOPE) && SENSOR_ACTIVE(SENS_GYROSCOPE)) {
-        gyro_characteristic = measurement_service->createCharacteristic(
-            "2C09", NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-        );
-    }
+    sensor_characteristic_map[SENS_LIGHT] = &light_characteristic;
+    sensor_characteristic_map[SENS_TEMPERATURE] = &temp_characteristic;
+    sensor_characteristic_map[SENS_HUMIDITY] = &hum_characteristic;
+    sensor_characteristic_map[SENS_PRESSURE] = &press_characteristic;
+    sensor_characteristic_map[SENS_ACCELERATION] = &accel_characteristic;
+    sensor_characteristic_map[SENS_GYROSCOPE] = &gyro_characteristic;
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->reset();
@@ -103,55 +84,52 @@ void ble_server_start() {
 void ble_server_update(const sensors_data_t &data, const uint8_t bat_level) {
     if(!device_connected) return; 
 
-    std::vector<uint8_t> data_to_send;
-
     for(unsigned i = 0; i < SENS_COUNT; i++) {
-        if (!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i)) continue; 
+        if(!SENSOR_ALIVE(i) || !SENSOR_ACTIVE(i)) continue; 
         
-        data_to_send.clear();
+        if(!sensor_characteristic_map[i]) continue;
+        NimBLECharacteristic *characteristic = *sensor_characteristic_map[i];
+        if(!characteristic) continue;
 
         switch(i) {
+            case SENS_LIGHT: {
+                uint32_t light_val = (uint32_t)(data.light * 100.0f + 0.5f);
+                characteristic->setValue((uint8_t*)&light_val, 3);
+                break;
+            }
             case SENS_TEMPERATURE: {
-                int16_t t = (int16_t)(data.temperature * 100 + 0.5f);
-                data_to_send.assign((uint8_t*)&t, (uint8_t*)&t + 2);
+                int16_t temp_val = (int16_t)(data.temperature * 100 + 0.5f);
+                characteristic->setValue((uint8_t*)&temp_val, 2);
                 break;
             }
             case SENS_HUMIDITY: {
-                uint16_t h = (uint16_t)(data.humidity * 100 + 0.5f);
-                data_to_send.assign((uint8_t*)&h, (uint8_t*)&h + 2);
+                uint16_t humid_val = (uint16_t)(data.humidity * 100 + 0.5f);
+                characteristic->setValue((uint8_t*)&humid_val, 2);
                 break;
             }
             case SENS_PRESSURE: {
-                uint32_t p = (uint32_t)(data.pressure * 1000 + 0.5f);
-                data_to_send.assign((uint8_t*)&p, (uint8_t*)&p + 4);
-                break;
-            }
-            case SENS_LIGHT: {
-                uint32_t lux_val = (uint32_t)(data.light * 100.0f + 0.5f);
-                data_to_send.assign((uint8_t*)&lux_val, (uint8_t*)&lux_val + 3);
+                uint32_t press_val = (uint32_t)(data.pressure * 1000 + 0.5f);
+                characteristic->setValue((uint8_t*)&press_val, 4);
                 break;
             }
             case SENS_ACCELERATION: {
                 int16_t accel_data[3];
-                for(int k=0; k<3; k++) accel_data[k] = (int16_t)(data.accel[k] * 100);
-                data_to_send.assign((uint8_t*)accel_data, (uint8_t*)accel_data + 6);
+                for(unsigned k = 0; k < 3; k++)
+                    accel_data[k] = (int16_t)(data.accel[k] * 100.0f + 0.5f);
+                characteristic->setValue((uint8_t*)accel_data, 6);
                 break;
             }
             case SENS_GYROSCOPE: {
                 int16_t gyro_data[3];
-                for(int k=0; k<3; k++) gyro_data[k] = (int16_t)(data.gyro[k] * 100);
-                data_to_send.assign((uint8_t*)gyro_data, (uint8_t*)gyro_data + 6);
+                for(unsigned k = 0; k < 3; k++)
+                    gyro_data[k] = (int16_t)(data.gyro[k] * 100.0f + 0.5f);
+                characteristic->setValue((uint8_t*)gyro_data, 6);
                 break;
             }
         }
 
-        if(!data_to_send.empty()) {
-            NimBLECharacteristic *characteristic = *sensor_characteristic_map[i];
-            if(characteristic != nullptr) {
-                characteristic->setValue(data_to_send);
-                characteristic->notify();
-            }
-        }
+        characteristic->notify();
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 
     bat_characteristic->setValue(&bat_level, 1);
@@ -176,4 +154,13 @@ void ble_server_stop() {
     }
 
     NimBLEDevice::deinit(true);
+
+    ble_server = nullptr;
+    bat_characteristic = nullptr;
+    temp_characteristic = nullptr;
+    hum_characteristic = nullptr;
+    press_characteristic = nullptr;
+    light_characteristic = nullptr;
+    accel_characteristic = nullptr;
+    gyro_characteristic = nullptr;
 }

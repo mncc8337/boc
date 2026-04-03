@@ -63,7 +63,7 @@ void SensorView::process_navigation(
         request_redraw();
     }
 
-    if(live_data_ready(sensor_event)) {
+    if(is_live_data_ready(sensor_event)) {
         graph_data[graph_data_pos++] = sensor_event.data[axis];
         graph_data_pos %= 127;
         request_redraw();
@@ -84,7 +84,7 @@ void SensorView::draw(U8G2 &u8g2) {
         y += 5 + 2;
 
         u8g2.setCursor(0, y);
-        u8g2.printf("interval: %dms", sample_interval_ms);
+        u8g2.printf("interval: %ldms", sample_interval_ms);
         y += 12 + 2;
 
         u8g2.setFont(u8g2_font_glasstown_nbp_tf);
@@ -92,7 +92,7 @@ void SensorView::draw(U8G2 &u8g2) {
         static unsigned long last_ts = 0;
         u8g2.setCursor(8, y);
         u8g2.printf(
-            "TS: %d, dTS = %d",
+            "TS: %d, dTS = %ld",
             sensor_event.timestamp,
             sensor_event.timestamp - last_ts
         ); y += 12;
@@ -120,11 +120,11 @@ void SensorView::draw(U8G2 &u8g2) {
         const int FONT_HEIGHT = 6;
         if(!multi_axis) {
             u8g2.setCursor(0, FONT_HEIGHT);
-            u8g2.printf("%s | %dms", get_sensor_type_string(sensor_type), sample_interval_ms);
+            u8g2.printf("%s | %ldms", get_sensor_type_string(sensor_type), sample_interval_ms);
         } else {
             u8g2.setCursor(0, FONT_HEIGHT);
             u8g2.printf(
-                "%s, %c | %dms",
+                "%s, %c | %ldms",
                 get_sensor_type_string(sensor_type),
                 axis == 0 ? 'x' : axis == 1 ? 'y' : 'z',
                 sample_interval_ms
