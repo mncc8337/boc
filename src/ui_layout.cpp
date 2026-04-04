@@ -295,6 +295,7 @@ void brightness_callback(uint8_t nval) {
     pref.begin(PREFERENCES, false);
     pref.putUChar(KEY_SCREEN_BRIGHTNESS, nval);
     pref.end();
+    u8g2.setContrast(nval);
     ESP_LOGI("SCREEN", "Brightness set to %d", nval);
 }
 RadioMenu<uint8_t> screen_brightness_menu(

@@ -44,27 +44,29 @@ bool force_file_flush = false;
 extern bool is_webserver_running;
 extern void loop_webserver();
 
-bool sleep_lock = false;
 bool screen_off = false;
 unsigned long screen_timeout;
 uint8_t screen_brightness;
 
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0);
 
+const unsigned SCREEN_STACK_SIZE = 8;
 Screen *current_screen;
-Screen *screen_stack[8];
+Screen *screen_stack[SCREEN_STACK_SIZE];
 unsigned screen_stack_ptr = 0;
 
 void draw_frame(Screen *screen) {
-    if(!screen->is_overlay())
-        u8g2.clearBuffer();
+    u8g2.clearBuffer();
+    if(screen->is_overlay() && screen_stack_ptr > 0) {
+        Screen *prev_screen = screen_stack[screen_stack_ptr - 1];
+        prev_screen->draw(u8g2);
+    }
     screen->draw(u8g2);
-    u8g2.setContrast(screen_brightness);
     u8g2.sendBuffer();
 }
 
 void open_screen(Screen *screen, bool forced=false) {
-    if(screen_stack_ptr >= 8 || current_screen == screen) {
+    if(screen_stack_ptr >= SCREEN_STACK_SIZE || current_screen == screen) {
         screen->request_redraw();
         return;
     }
@@ -72,13 +74,13 @@ void open_screen(Screen *screen, bool forced=false) {
         open_notification("This menu is\nnot available\nright now");
         return;
     }
+
     current_screen->close_callback();
     screen_stack[screen_stack_ptr++] = current_screen;
+
     current_screen = screen;
     current_screen->open_callback();
     current_screen->request_redraw();
-
-    sleep_lock = current_screen->prevent_sleep();
 
     if(forced)
         draw_frame(current_screen);
@@ -86,15 +88,14 @@ void open_screen(Screen *screen, bool forced=false) {
     ESP_LOGD("UI", "Screen 0x%X opened", current_screen);
 }
 void open_prev_screen() {
-    if(!screen_stack_ptr) return;
+    if(screen_stack_ptr == 0) return;
+
     current_screen->close_callback();
     current_screen = screen_stack[--screen_stack_ptr];
+
     current_screen->open_callback();
     current_screen->request_redraw();
     ESP_LOGD("UI", "Screen 0x%X opened", current_screen);
-}
-
-void i2c_init() {
 }
 
 void shutdown() {
@@ -112,7 +113,7 @@ void shutdown() {
 }
 
 void turn_off_screen() {
-    if(screen_off || sleep_lock) return;
+    if(screen_off || current_screen->prevent_sleep()) return;
 
     u8g2.setPowerSave(1);
 
@@ -154,7 +155,7 @@ void turn_off_screen() {
 }
 
 void turn_on_screen() {
-    if(!screen_off || sleep_lock) return;
+    if(!screen_off || current_screen->prevent_sleep()) return;
 
     // if this func get called
     // that mean beacon mode is not running
@@ -245,6 +246,7 @@ void setup() {
     }
 
     u8g2.begin();
+    u8g2.setContrast(screen_brightness);
 
     if(sensors_init() != (1 << SENS_COUNT) - 1) {
         u8g2.clearBuffer();
@@ -450,7 +452,7 @@ void loop() {
     if(button_down_action || button_up_action || button_select_press_time) {
         idle_ts = current_ts;
         turn_on_screen();
-    } else if(current_ts - idle_ts > screen_timeout && !sleep_lock) {
+    } else if(current_ts - idle_ts > screen_timeout && !current_screen->prevent_sleep()) {
         ESP_LOGW("SYSTEM", "Turning off due to no activity");
         idle_ts = current_ts; // prevent sleeping again after waking up
         turn_off_screen();
