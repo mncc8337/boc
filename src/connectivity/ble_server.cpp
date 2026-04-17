@@ -2,8 +2,9 @@
 #include <NimBLEDevice.h>
 #include <sensors.h>
 
-const char ACCEL_UUID[] = "987e092b-840d-4bba-8e09-07e904bd4903";
-const char GYRO_UUID[] = "9520136e-3e6a-475e-82dc-c73130bfe46f";
+const char ACC_UUID[] = "987e092b-840d-4bba-8e09-07e904bd4903";
+const char GYR_UUID[] = "9520136e-3e6a-475e-82dc-c73130bfe46f";
+const char MAG_UUID[] = "e9cfa89f-9657-4c72-8430-72d1502b4fac";
 
 static NimBLEServer* ble_server = nullptr;
 
@@ -14,6 +15,7 @@ static NimBLECharacteristic* press_characteristic = nullptr;
 static NimBLECharacteristic* light_characteristic = nullptr;
 static NimBLECharacteristic* accel_characteristic = nullptr;
 static NimBLECharacteristic* gyro_characteristic = nullptr;
+static NimBLECharacteristic* mag_characteristic = nullptr;
 
 NimBLECharacteristic **sensor_characteristic_map[SENS_COUNT] {nullptr};
 
@@ -56,10 +58,13 @@ void ble_server_start() {
 
     NimBLEService* measurement_service = ble_server->createService("185A");
     accel_characteristic = measurement_service->createCharacteristic(
-        ACCEL_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        ACC_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
     );
     gyro_characteristic = measurement_service->createCharacteristic(
-        GYRO_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+        GYR_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
+    );
+    mag_characteristic = measurement_service->createCharacteristic(
+        MAG_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
     );
 
     sensor_characteristic_map[SENS_LIGHT] = &light_characteristic;
@@ -68,6 +73,7 @@ void ble_server_start() {
     sensor_characteristic_map[SENS_PRESSURE] = &press_characteristic;
     sensor_characteristic_map[SENS_ACCELERATION] = &accel_characteristic;
     sensor_characteristic_map[SENS_GYROSCOPE] = &gyro_characteristic;
+    sensor_characteristic_map[SENS_MAGNETIC_FIELD] = &mag_characteristic;
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     advertising->reset();
@@ -126,6 +132,13 @@ void ble_server_update(const sensors_data_t &data, const uint8_t bat_level) {
                 characteristic->setValue((uint8_t*)gyro_data, 6);
                 break;
             }
+            case SENS_MAGNETIC_FIELD: {
+                int16_t mag_data[3];
+                for(unsigned k = 0; k < 3; k++)
+                    mag_data[k] = (int16_t)(data.mag[k] * 100.0f + 0.5f);
+                characteristic->setValue((uint8_t*)mag_data, 6);
+                break;
+            }
         }
 
         characteristic->notify();
@@ -163,4 +176,5 @@ void ble_server_stop() {
     light_characteristic = nullptr;
     accel_characteristic = nullptr;
     gyro_characteristic = nullptr;
+    mag_characteristic = nullptr;
 }

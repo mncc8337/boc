@@ -16,6 +16,7 @@ enum SensorEnum {
     SENS_PRESSURE,
     SENS_ACCELERATION,
     SENS_GYROSCOPE,
+    SENS_MAGNETIC_FIELD,
     SENS_COUNT // put this at the end of the list
 };
 
@@ -26,6 +27,7 @@ typedef struct {
     float light;
     float accel[3];
     float gyro[3];
+    float mag[3];
 } sensors_data_t;
 
 typedef uint16_t sensor_mask_t;

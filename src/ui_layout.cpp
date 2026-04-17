@@ -394,6 +394,9 @@ void do_sync_time() {
 }
 FunctionAction sync_time("Sync Time", do_sync_time);
 
+InfoScreen info_screen_instance;
+OpenScreenAction open_info_menu("Info", &info_screen_instance);
+
 void do_clear_datalog() {
     if(LittleFS.exists("/data.log")) {
         File f = LittleFS.open("/data.log", "w");
@@ -417,6 +420,7 @@ std::vector<Action*> settings_menu_items = {
     &open_sensors_menu,
     &open_screen_menu,
     &sync_time,
+    &open_info_menu,
     &clear_datalog,
     &reboot,
     &do_shutdown,
@@ -446,16 +450,12 @@ void do_open_webserver() {
 }
 FunctionAction open_webserver("Start Server", do_open_webserver);
 
-InfoScreen info_screen_instance;
-OpenScreenAction open_info_menu("Info", &info_screen_instance);
-
 SplashScreen splash_screen;
 OpenScreenAction open_splash_screen("Splash GIF", &splash_screen);
 
 std::vector<Action*> tools_menu_items = {
     &open_live_data_menu,
     &open_webserver,
-    &open_info_menu,
     &open_splash_screen,
 };
 Menu tools_menu(tools_menu_items);

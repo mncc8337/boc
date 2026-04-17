@@ -1,3 +1,4 @@
+#include "sensors.h"
 #include <data_logger.h>
 
 void write_log_packet(File &file, sensors_data_t &data) {
@@ -34,6 +35,9 @@ void write_log_packet(File &file, sensors_data_t &data) {
                 break;
             case SENS_GYROSCOPE:
                 file.write((const uint8_t *)data.gyro, sizeof(float) * 3);
+                break;
+            case SENS_MAGNETIC_FIELD:
+                file.write((const uint8_t *)data.mag, sizeof(float) * 3);
                 break;
         }
     }

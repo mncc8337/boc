@@ -6,6 +6,7 @@ import time
 from enum import IntEnum
 from bleak import BleakScanner
 
+
 class SensorType(IntEnum):
     ACCELEROMETER = 1
     MAGNETIC_FIELD = 2
@@ -38,6 +39,7 @@ class SensorType(IntEnum):
     UNITLESS_PERCENT = 30
     ALTITUDE = 31
 
+
 MULTIPLIER_MAP = {
     SensorType.AMBIENT_TEMPERATURE: 0.01,
     SensorType.RELATIVE_HUMIDITY: 0.01,
@@ -51,48 +53,55 @@ UNIT_MAP = {
     SensorType.PRESSURE: "hPa",
     SensorType.LIGHT: "Lux",
     SensorType.ACCELEROMETER: "m/s2",
-    SensorType.GYROSCOPE: "rad/s"
+    SensorType.GYROSCOPE: "rad/s",
+    SensorType.MAGNETIC_FIELD: "μT",
 }
+
 
 def parse_payload(raw_data):
     i = 0
     results = {}
-    
+
     while i < len(raw_data):
         try:
             s_type_val = raw_data[i]
             i += 1
-            
+
             try:
                 s_type = SensorType(s_type_val)
             except ValueError:
-                continue 
+                continue
 
-            if s_type in (SensorType.ACCELEROMETER, SensorType.GYROSCOPE):
+            if s_type in (
+                SensorType.ACCELEROMETER,
+                SensorType.GYROSCOPE,
+                SensorType.MAGNETIC_FIELD
+            ):
                 if i + 6 <= len(raw_data):
                     x, y, z = struct.unpack_from('<hhh', raw_data, i)
                     i += 6
-                    
+
                     results[s_type.name] = f"X:{x/100:.2f} Y:{y/100:.2f} Z:{z/100:.2f} {UNIT_MAP.get(s_type, '')}"
                 else:
                     break
-                    
+
             else:
                 if i + 2 <= len(raw_data):
                     raw_val, = struct.unpack_from('<h', raw_data, i)
                     i += 2
-                    
+
                     multiplier = MULTIPLIER_MAP.get(s_type, 1.0)
                     final_val = round(raw_val * multiplier, 2)
-                    
+
                     results[s_type.name] = f"{final_val} {UNIT_MAP.get(s_type, '')}"
                 else:
                     break
-                    
+
         except IndexError:
             break
-            
+
     return results
+
 
 def detection_callback(device, advertisement_data):
     if advertisement_data.local_name != "BOC":
@@ -100,22 +109,23 @@ def detection_callback(device, advertisement_data):
 
     mfg_data = advertisement_data.manufacturer_data
     chunk1 = mfg_data.get(0xFFFF, b'')
-    
+
     chunk2 = mfg_data.get(0xFEFF, b'')
-    
+
     all_raw = chunk1 + chunk2
-        
+
     if all_raw:
         print(f"\n[+] {time.strftime("%H:%M:%S", time.localtime())} | MAC: {device.address} | RSSI: {advertisement_data.rssi} dBm")
         print(f"    RAW: {all_raw.hex().upper()}")
-        
+
         decoded = parse_payload(all_raw)
         for sensor, value in decoded.items():
             print(f"    -> {sensor:20}: {value}")
 
+
 async def main():
     scanner = BleakScanner(
-        detection_callback, 
+        detection_callback,
         scanning_mode="active",
         duplicate_value=True
         # adapter="hci0"

@@ -2,8 +2,10 @@
 #include <Adafruit_BMP280.h>
 #include <Adafruit_AHTX0.h>
 #include <hp_BH1750.h>
+#include <BMI160_QMC5883P.h>
 #include <BH1750_US.h>
 #include <BMI160_US.h>
+#include <QMC5883P_US.h>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -13,9 +15,11 @@
 Adafruit_BMP280 bmp280;
 Adafruit_AHTX0 ahtx0;
 hp_BH1750 bh1750_hw;
+BMI160_QMC5883P qmc5883p_hw(BMI160);
 BH1750_US bh1750(bh1750_hw, 1750);
 BMI160_US_Accelerometer bmi160_accel(160);
 BMI160_US_Gyroscope bmi160_gyro(160);
+QMC5883P_US_Magnetometer qmc5883p(qmc5883p_hw, 5883);
 
 Adafruit_Sensor *sensors[SENS_COUNT];
 sensor_mask_t sensor_mask;
@@ -121,13 +125,11 @@ const char* get_sensor_unit_string(const int type) {
 }
 
 static void bmi160_on() {
-    BMI160.setRegister(0x7E, 0x11); delay(50);
-    BMI160.setRegister(0x7E, 0x15); delay(50);
+    // FIXME
 }
 
 static void bmi160_off() {
-    BMI160.setRegister(0x7E, 0x10); delay(50);
-    BMI160.setRegister(0x7E, 0x14); delay(50);
+    // FIXME
 }
 
 TaskHandle_t sensors_task_handle = nullptr;
@@ -188,6 +190,23 @@ uint16_t sensors_init() {
         ESP_LOGI("SENSORS", "BMI160 initialized");
     } else {
         ESP_LOGE("SENSORS", "BMI160 failed to initialize");
+    }
+
+    if(SENSOR_ALIVE(SENS_ACCELERATION)) {
+        // initialize qmc5883p
+        if(qmc5883p_hw.begin(QMC5883P_ROTATION_90)) {
+            sensor_mask |= 1 << SENS_MAGNETIC_FIELD;
+            sensors[SENS_MAGNETIC_FIELD] = &qmc5883p;
+            qmc5883p_hw.setMode(QMC_MODE_CONTINUOUS);
+            qmc5883p_hw.setODR(QMC_ODR_100HZ);
+            qmc5883p_hw.setOSR1(QMC_OVERSAMPLING_X8);
+            qmc5883p_hw.setRange(QMC_RANGE_2G);
+            qmc5883p_hw.setSetResetMode(QMC_SET_RESET_ON);
+            qmc5883p_hw.applySettings();
+            ESP_LOGI("SENSORS", "QMC5883P initialized as BMI160's slave");
+        } else {
+            ESP_LOGE("SENSORS", "QMC5883P failed to initialize as BMI160's slave");
+        }
     }
 
     // setup rtos task stuff
@@ -347,6 +366,11 @@ void sensors_task(void *parameters) {
                             all_data.gyro[0] = t_event.gyro.x;
                             all_data.gyro[1] = t_event.gyro.y;
                             all_data.gyro[2] = t_event.gyro.z;
+                            break;
+                        case SENS_MAGNETIC_FIELD:
+                            all_data.mag[0] = t_event.magnetic.x;
+                            all_data.mag[1] = t_event.magnetic.y;
+                            all_data.mag[2] = t_event.magnetic.z;
                             break;
                     }
                 }

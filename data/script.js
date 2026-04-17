@@ -8,6 +8,7 @@ async function fetchAndParse() {
     let labels = [], dataLight = [], dataTemp = [], dataHum = [], dataPress = [];
     let accelX = [], accelY = [], accelZ = [];
     let gyroX = [], gyroY = [], gyroZ = [];
+    let magX = [], magY = [], magZ = [];
 
     try {
         const response = await fetch('/data.log');
@@ -54,6 +55,7 @@ async function fetchAndParse() {
             let pressVal = (mask & (1 << 3)) ? getFloats(1)[0] : null;
             let accelVals = (mask & (1 << 4)) ? getFloats(3) : [null, null, null];
             let gyroVals  = (mask & (1 << 5)) ? getFloats(3) : [null, null, null];
+            let magVals  = (mask & (1 << 6)) ? getFloats(3) : [null, null, null];
 
             dataLight.push(lightVal);
             dataTemp.push(tempVal);
@@ -61,6 +63,7 @@ async function fetchAndParse() {
             dataPress.push(pressVal);
             accelX.push(accelVals[0]); accelY.push(accelVals[1]); accelZ.push(accelVals[2]);
             gyroX.push(gyroVals[0]);   gyroY.push(gyroVals[1]);   gyroZ.push(gyroVals[2]);
+            magX.push(magVals[0]);   magY.push(magVals[1]);   magZ.push(magVals[2]);
 
             htmlStr += `<tr>
                 <td>${timeStr}</td>
@@ -70,6 +73,7 @@ async function fetchAndParse() {
                 <td>${pressVal ?? "-"}</td>
                 <td>${accelVals[0] !== null ? accelVals.join(', ') : "-"}</td>
                 <td>${gyroVals[0] !== null ? gyroVals.join(', ') : "-"}</td>
+                <td>${magVals[0] !== null ? magVals.join(', ') : "-"}</td>
             </tr>`;
         }
         
@@ -83,6 +87,7 @@ async function fetchAndParse() {
         
         renderIMUChart('accelChart', 'Accelerometer (m/s2)', labels, accelX, accelY, accelZ);
         renderIMUChart('gyroChart', 'Gyroscope (rad/s)', labels, gyroX, gyroY, gyroZ);
+        renderIMUChart('magChart', 'Magnetometer (μT)', labels, magX, magY, magZ);
         
     } catch(err) {
         tbody.innerHTML = `<tr><td colspan='7' style='color:red;'>Error: ${err.message}</td></tr>`;

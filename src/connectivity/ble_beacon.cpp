@@ -1,3 +1,4 @@
+#include "Adafruit_Sensor.h"
 #include <connectivity.h>
 #include <NimBLEDevice.h>
 #include <sensors.h>
@@ -58,11 +59,20 @@ static void make_ble_beacon_payload(const sensors_data_t &data, std::vector<uint
                 }
                 break;
             }
+            case SENS_MAGNETIC_FIELD: {
+                payload.push_back(SENSOR_TYPE_MAGNETIC_FIELD);
+                for(int k = 0; k < 3; k++) {
+                    int16_t a = (int16_t)(data.mag[k] * 100);
+                    payload.push_back(a & 0xFF);
+                    payload.push_back((a >> 8) & 0xFF);
+                }
+                break;
+            }
         }
     }
 
     if(payload.size() > 20) {
-        payload.insert(payload.begin() + 20, {0xFF, 0xFF});
+        payload.insert(payload.begin() + 20, {0xFF, 0xFE});
     }
 }
 

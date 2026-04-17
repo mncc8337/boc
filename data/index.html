@@ -45,6 +45,7 @@
         <div class="tab" onclick="openTab(event, 'tab-light')">Light</div>
         <div class="tab" onclick="openTab(event, 'tab-accel')">Accelerometer</div>
         <div class="tab" onclick="openTab(event, 'tab-gyro')">Gyroscope</div>
+        <div class="tab" onclick="openTab(event, 'tab-mag')">Magnetometer</div>
         <div class="tab" onclick="openTab(event, 'tab-table')">Raw Table</div>
     </div>
 
@@ -54,6 +55,7 @@
     <div id="tab-light" class="tab-content"><div class="chart-container"><canvas id="lightChart"></canvas></div></div>
     <div id="tab-accel" class="tab-content"><div class="chart-container"><canvas id="accelChart"></canvas></div></div>
     <div id="tab-gyro" class="tab-content"><div class="chart-container"><canvas id="gyroChart"></canvas></div></div>
+    <div id="tab-mag" class="tab-content"><div class="chart-container"><canvas id="magChart"></canvas></div></div>
 
     <div id="tab-table" class="tab-content">
         <div class="table-container">
@@ -67,6 +69,7 @@
                         <th>Press (hPa)</th>
                         <th>Accel (X,Y,Z) (m/s2)</th>
                         <th>Gyro (X,Y,Z) (rad/s)</th>
+                        <th>Mag (X,Y,Z) (μT)</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
